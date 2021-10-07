@@ -1,5 +1,5 @@
 package mongo
 
 package object hkd {
-  type Id[+A] = A
+  type Id[A] = A
 }
