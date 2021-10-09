@@ -75,8 +75,8 @@ trait QueryDsl extends QueryDslLowPriorityImplicits {
       FieldMatchExpr(field, w.writeTry(value).get)
   }
 
-  implicit def stringComparisons(field: BSONField[String]): StringComparisons[Id] =
-    new StringComparisons[Id](field)
+  implicit def stringComparisons(field: BSONField[String]): StringComparisons[({ type id[x] = x })#id] =
+    new StringComparisons[({ type id[x] = x })#id](field)
 
   implicit class StringComparisons[F[_]](field: BSONField[F[String]])(implicit w: BSONWriter[F[String]]) {
     def $regex(regex: String, flags: String = ""): FieldComparison[F[String]] =

@@ -16,7 +16,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.language.postfixOps
 
-class DslTest extends AsyncFreeSpec with Matchers with ForAllTestContainer {
+class QueryDslTest extends AsyncFreeSpec with Matchers with ForAllTestContainer {
 
   override implicit def executionContext: ExecutionContext = ExecutionContext.global
 
@@ -162,6 +162,10 @@ class DslTest extends AsyncFreeSpec with Matchers with ForAllTestContainer {
                     .findQuery[Data](_.nestedData ~ (_.id) $not (_ $eq uuid1))
                     .cursor[Id]
                     .collect[List]()
+        found9 <- collection
+                    .findQuery[Data](fs => (fs.id $eq 1) $or (fs.nestedData m data2.nestedData))
+                    .cursor[Id]
+                    .collect[List]()
       } yield {
         found0 should be(data2 :: data1 :: Nil)
         found1 should be(Some(data1))
@@ -172,6 +176,8 @@ class DslTest extends AsyncFreeSpec with Matchers with ForAllTestContainer {
         found6 should be(data1)
         found7 should be(data1 :: data2 :: Nil)
         found8 should be(data2 :: Nil)
+        found8 should be(data2 :: Nil)
+        found9 should be(data1 :: data2 :: Nil)
       }
     }
   }
