@@ -6,7 +6,6 @@ import reactivemongo.api.bson._
 import reactivemongo.api.bson.collection.BSONCollection
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Success
 
 sealed trait BSONValueWrapper {
   def bson: BSONValue
@@ -28,28 +27,6 @@ final case class FieldMatchExpr[A](field: BSONField[A], wrapper: BSONValueWrappe
 final case class FieldComparison[A](field: BSONField[A], operator: String, wrapper: BSONValueWrapper) extends Query {
   def expr: BSONDocument = document(operator -> wrapper.bson)
   def bson: BSONDocument = document(field.fieldName -> expr)
-}
-
-sealed trait Match[A]
-final case class MatchValue[A](value: A)                     extends Match[A]
-final case class MatchNested[A](bson: BSONValue)             extends Match[A]
-final case class MatchRegex[A](regex: String, flags: String) extends Match[A]
-final case class MatchIgnore[A]()                            extends Match[A]
-
-object Match {
-  def value[A](value: A): Match[A]                                                                  = MatchValue(value)
-  def regex[F[_]](regex: String, flags: String = ""): Match[F[String]]                              = MatchRegex(regex, flags)
-  def nested[Data[f[_]], F[_]](value: Data[F])(implicit w: BSONWriter[Data[F]]): Match[Data[Match]] = MatchNested(
-    w.writeTry(value).get
-  )
-  def ignore[A]: Match[A]                                                                           = MatchIgnore()
-
-  implicit def `BSONWriter[Match[A]]`[A](implicit w: BSONWriter[A]): BSONWriter[Match[A]] = BSONWriter.from {
-    case MatchValue(value)        => w.writeTry(value)
-    case MatchNested(bson)        => Success(bson)
-    case MatchRegex(regex, flags) => Success(BSONRegex(regex, flags))
-    case MatchIgnore()            => Success(BSONUndefined)
-  }
 }
 
 trait QueryDsl extends QueryDslLowPriorityImplicits {
@@ -78,9 +55,6 @@ trait QueryDsl extends QueryDslLowPriorityImplicits {
       builder.cursor[Data[F]](readPreference)
   }
 
-  private def filterBSONUndefined(doc: BSONDocument): BSONDocument =
-    document(doc.elements.filterNot(_.value == BSONUndefined): _*)
-
   implicit class CollectionOperations(collection: BSONCollection) {
     def findAll[Data[f[_]]]: FindOperations[Data] =
       FindOperations(collection.find(document))
@@ -88,10 +62,6 @@ trait QueryDsl extends QueryDslLowPriorityImplicits {
         fields: BSONField.Fields[Data]
     ): FindOperations[Data]                       =
       FindOperations(collection.find(query(fields).bson))
-    def findMatch[Data[f[_]]](data: Data[Match])(implicit
-        w: BSONDocumentWriter[Data[Match]]
-    ): FindOperations[Data]                       =
-      FindOperations(collection.find(w.writeTry(data).map(filterBSONUndefined).get))
   }
 
   implicit class LogicalOperators[A <: Query](left: A) {

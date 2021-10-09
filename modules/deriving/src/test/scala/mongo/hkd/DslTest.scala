@@ -48,125 +48,6 @@ class DslTest extends AsyncFreeSpec with Matchers with ForAllTestContainer {
       result     <- body(database.collection("collection"))
     } yield result
 
-  "Match" - {
-    "BSONWriter" in {
-      val data = Data[Match](
-        id = Match.value(1),
-        name = Match.ignore,
-        description = Match.value(None),
-        isActive = Match.ignore,
-        nestedData = Match.value(
-          NestedData(
-            id = Match.value(new UUID(0, 0)),
-            secondField = Match.regex("/str/")
-          )
-        )
-      )
-      pretty(BSON.write(data).get) should be("""{
-          |  'id': 1,
-          |  'name': undefined,
-          |  'description': null,
-          |  'is_active': undefined,
-          |  'nested_data': {
-          |    'id': '00000000-0000-0000-0000-000000000000',
-          |    'second_field': BSONRegex(/str/, )
-          |  }
-          |}""".stripMargin)
-    }
-    "findMatch" in withCollection { collection =>
-      for {
-        found0 <- collection
-                    .findMatch[Data](
-                      Data(
-                        id = Match.ignore,
-                        name = Match.ignore,
-                        description = Match.ignore,
-                        isActive = Match.ignore,
-                        nestedData = Match.ignore
-                      )
-                    )
-                    .options(_.sort(document("id" -> -1)))
-                    .cursor[Id]
-                    .collect[List]()
-        found1 <- collection
-                    .findMatch[Data](
-                      Data(
-                        id = Match.value(1),
-                        name = Match.ignore,
-                        description = Match.ignore,
-                        isActive = Match.ignore,
-                        nestedData = Match.ignore
-                      )
-                    )
-                    .one[Id]
-        found2 <- collection
-                    .findMatch[Data](
-                      Data(
-                        id = Match.value(2),
-                        name = Match.ignore,
-                        description = Match.ignore,
-                        isActive = Match.ignore,
-                        nestedData = Match.ignore
-                      )
-                    )
-                    .one[Id]
-        found3 <- collection
-                    .findMatch[Data](
-                      Data(
-                        id = Match.value(3),
-                        name = Match.ignore,
-                        description = Match.ignore,
-                        isActive = Match.ignore,
-                        nestedData = Match.ignore
-                      )
-                    )
-                    .one[Id]
-        found4 <- collection
-                    .findMatch[Data](
-                      Data(
-                        id = Match.ignore,
-                        name = Match.regex[Id]("""(name)\d?"""),
-                        description = Match.ignore,
-                        isActive = Match.ignore,
-                        nestedData = Match.ignore
-                      )
-                    )
-                    .cursor[Id]
-                    .collect[List]()
-        found5 <- collection
-                    .findMatch[Data](
-                      Data(
-                        id = Match.ignore,
-                        name = Match.regex[Id]("""(name)\d?"""),
-                        description = Match.value(None),
-                        isActive = Match.ignore,
-                        nestedData = Match.ignore
-                      )
-                    )
-                    .cursor[Id]
-                    .collect[List]()
-        found6 <- collection
-                    .findMatch[Data](
-                      Data(
-                        id = Match.ignore,
-                        name = Match.ignore,
-                        description = Match.ignore,
-                        isActive = Match.ignore,
-                        nestedData = Match.nested(data1.nestedData)
-                      )
-                    )
-                    .one[Id]
-      } yield {
-        found0 should be(data2 :: data1 :: Nil)
-        found1 should be(Some(data1))
-        found2 should be(Some(data2))
-        found3 should be(None)
-        found4 should be(data1 :: data2 :: Nil)
-        found5 should be(data2 :: Nil)
-        found6 should be(Some(data1))
-      }
-    }
-  }
   "Query" - {
     val fields = BSONField.fields[Data]
     "match dsl" in {
@@ -272,9 +153,13 @@ class DslTest extends AsyncFreeSpec with Matchers with ForAllTestContainer {
                     .collect[List]()
         found6 <- collection
                     .findQuery[Data](_.nestedData m data1.nestedData)
-                    .one[Id]
+                    .requireOne[Id]
         found7 <- collection
                     .findQuery[Data](_.nestedData ~ (_.id) $in (uuid1, uuid2))
+                    .cursor[Id]
+                    .collect[List]()
+        found8 <- collection
+                    .findQuery[Data](_.nestedData ~ (_.id) $not (_ $eq uuid1))
                     .cursor[Id]
                     .collect[List]()
       } yield {
@@ -284,8 +169,9 @@ class DslTest extends AsyncFreeSpec with Matchers with ForAllTestContainer {
         found3 should be(None)
         found4 should be(data1 :: data2 :: Nil)
         found5 should be(data2 :: Nil)
-        found6 should be(Some(data1))
+        found6 should be(data1)
         found7 should be(data1 :: data2 :: Nil)
+        found8 should be(data2 :: Nil)
       }
     }
   }
