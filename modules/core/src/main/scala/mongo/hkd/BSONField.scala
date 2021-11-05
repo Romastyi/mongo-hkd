@@ -25,7 +25,9 @@ object BSONField extends HighPriorityImplicits {
     def nested[A](accessor: Data[BSONField] => BSONField[A])(implicit f: Fields[Data]): BSONField[A] =
       Nested(data.fieldName, accessor(f))
 
-    def ~[A](accessor: Data[BSONField] => BSONField[A])(implicit f: Fields[Data]): BSONField[A] = nested(accessor)
+    @inline def ~[A](accessor: Data[BSONField] => BSONField[A])(implicit f: Fields[Data]): BSONField[A] = nested(
+      accessor
+    )
   }
 
 }

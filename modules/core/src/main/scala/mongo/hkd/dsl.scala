@@ -1,3 +1,3 @@
 package mongo.hkd
 
-object dsl extends QueryDsl
+object dsl extends CollectionDsl with QueryDsl

@@ -55,13 +55,11 @@ trait QueryDsl extends QueryDslLowPriorityImplicits {
       builder.cursor[Data[F]](readPreference)
   }
 
-  implicit class CollectionOperations(collection: BSONCollection) {
-    def findAll[Data[f[_]]]: FindOperations[Data] =
-      FindOperations(collection.find(document))
-    def findQuery[Data[f[_]]](query: BSONField.Fields[Data] => Query)(implicit
-        fields: BSONField.Fields[Data]
-    ): FindOperations[Data]                       =
-      FindOperations(collection.find(query(fields).bson))
+  implicit class CollectionOperations[Data[f[_]]](collection: HKDBSONCollection[Data]) {
+    def findAll: FindOperations[Data]                                           =
+      FindOperations(collection.delegate(_.find(document)))
+    def findQuery(query: BSONField.Fields[Data] => Query): FindOperations[Data] =
+      FindOperations(collection.delegate(_.find(query(collection.fields).bson)))
   }
 
   implicit class LogicalOperators[A <: Query](left: A) {

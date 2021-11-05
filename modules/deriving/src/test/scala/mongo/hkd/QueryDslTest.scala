@@ -1,26 +1,16 @@
 package mongo.hkd
 
-import com.dimafeng.testcontainers.{ForAllTestContainer, MongoDBContainer}
 import mongo.hkd.dsl._
 import mongo.hkd.implicits._
-import org.scalatest.freespec.AsyncFreeSpec
-import org.scalatest.matchers.should.Matchers
-import org.testcontainers.utility.DockerImageName
-import reactivemongo.api.{AsyncDriver, MongoConnection}
 import reactivemongo.api.bson.BSONValue.pretty
 import reactivemongo.api.bson._
-import reactivemongo.api.bson.collection._
 
 import java.util.UUID
 import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
 
-class QueryDslTest extends AsyncFreeSpec with Matchers with ForAllTestContainer {
-
-  override implicit def executionContext: ExecutionContext = ExecutionContext.global
-
-  override val container: MongoDBContainer = MongoDBContainer(DockerImageName.parse("mongo:4.2.3"))
+class QueryDslTest extends CommonMongoSpec {
 
   val uuid1 = new UUID(0, 0)
   val data1 = Data[Id](1, "name1", Some("str"), true, NestedData[Id](uuid1, Some("field")))
@@ -30,23 +20,15 @@ class QueryDslTest extends AsyncFreeSpec with Matchers with ForAllTestContainer 
   override def afterStart(): Unit = {
     Await.result(
       Future { Thread.sleep(10000) }.flatMap { _ =>
-        withCollection { collection =>
+        withCollection[Data].apply { collection =>
           for {
-            _ <- collection.insert(false).many(Seq(data1, data2))
+            _ <- collection.delegate(_.insert(false).many(Seq(data1, data2)))
           } yield ()
         }
       },
       25 seconds
     )
   }
-
-  def withCollection[A](body: BSONCollection => Future[A]): Future[A] =
-    for {
-      uri        <- MongoConnection.fromString(container.replicaSetUrl + "?connectTimeoutMS=10000")
-      connection <- AsyncDriver().connect(uri, Some("test"), strictMode = true)
-      database   <- connection.database("test")
-      result     <- body(database.collection("collection"))
-    } yield result
 
   "Query" - {
     val fields = BSONField.fields[Data]
@@ -127,43 +109,42 @@ class QueryDslTest extends AsyncFreeSpec with Matchers with ForAllTestContainer 
           |  ]
           |}""".stripMargin)
     }
-    "findQuery" in withCollection { collection =>
+    "findQuery" in withCollection[Data].apply { collection =>
       for {
-        found0 <- collection
-                    .findAll[Data]
+        found0 <- collection.findAll
                     .options(_.sort(document("id" -> -1)))
                     .cursor[Id]
                     .collect[List]()
         found1 <- collection
-                    .findQuery[Data](_.id $eq 1)
+                    .findQuery(_.id $eq 1)
                     .one[Id]
         found2 <- collection
-                    .findQuery[Data](_.id $eq 2)
+                    .findQuery(_.id $eq 2)
                     .one[Id]
         found3 <- collection
-                    .findQuery[Data](_.id $eq 3)
+                    .findQuery(_.id $eq 3)
                     .one[Id]
         found4 <- collection
-                    .findQuery[Data](_.name $regex """(name)\d?""")
+                    .findQuery(_.name $regex """(name)\d?""")
                     .cursor[Id]
                     .collect[List]()
         found5 <- collection
-                    .findQuery[Data](fs => (fs.name $regex """(name)\d?""") $and (fs.description $eq None))
+                    .findQuery(fs => (fs.name $regex """(name)\d?""") $and (fs.description $eq None))
                     .cursor[Id]
                     .collect[List]()
         found6 <- collection
-                    .findQuery[Data](_.nestedData m data1.nestedData)
+                    .findQuery(_.nestedData m data1.nestedData)
                     .requireOne[Id]
         found7 <- collection
-                    .findQuery[Data](_.nestedData ~ (_.id) $in (uuid1, uuid2))
+                    .findQuery(_.nestedData ~ (_.id) $in (uuid1, uuid2))
                     .cursor[Id]
                     .collect[List]()
         found8 <- collection
-                    .findQuery[Data](_.nestedData ~ (_.id) $not (_ $eq uuid1))
+                    .findQuery(_.nestedData ~ (_.id) $not (_ $eq uuid1))
                     .cursor[Id]
                     .collect[List]()
         found9 <- collection
-                    .findQuery[Data](fs => (fs.id $eq 1) $or (fs.nestedData m data2.nestedData))
+                    .findQuery(fs => (fs.id $eq 1) $or (fs.nestedData m data2.nestedData))
                     .cursor[Id]
                     .collect[List]()
       } yield {
