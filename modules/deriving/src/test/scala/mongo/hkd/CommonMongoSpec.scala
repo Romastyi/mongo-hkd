@@ -23,6 +23,7 @@ abstract class CommonMongoSpec extends AsyncFreeSpec with Matchers with ForAllTe
     new CollectionApply(
       for {
         uri        <- MongoConnection.fromString(container.replicaSetUrl + "?connectTimeoutMS=10000")
+        _           = Thread.sleep(200)
         connection <- AsyncDriver().connect(uri, Some("test"), strictMode = true)
         database   <- connection.database("test")
       } yield database.collectionOf[HKD]("collection")
