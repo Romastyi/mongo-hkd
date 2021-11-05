@@ -12,10 +12,12 @@ import scala.language.postfixOps
 
 class QueryDslTest extends CommonMongoSpec {
 
+  val oid1  = BSONObjectID.generate().stringify
   val uuid1 = new UUID(0, 0)
-  val data1 = Data[Id](1, "name1", Some("str"), true, NestedData[Id](uuid1, Some("field")))
+  val data1 = Data[Id](oid1, 1, "name1", Some("str"), true, NestedData[Id](uuid1, Some("field")))
+  val oid2  = BSONObjectID.generate().stringify
   val uuid2 = new UUID(0, 1)
-  val data2 = Data[Id](2, "name2", None, false, NestedData[Id](uuid2, None))
+  val data2 = Data[Id](oid2, 2, "name2", None, false, NestedData[Id](uuid2, None))
 
   override def afterStart(): Unit = {
     Await.result(

@@ -10,10 +10,13 @@ class IndexDslTest extends CommonMongoSpec {
   "ensureIndices(...)" in withCollection[Data].apply { collection =>
     for {
       _       <- collection.ensureIndices(
+                   _.oid.ascending.index(name =
+                     Some("idx0")
+                   ), // Will not create any additional index, only duplicates the default index by `_id` field.
                    _.name.hashed.index(name = Some("idx1")),
                    fs => List(fs.name.text.weight(10), fs.description.text).index(name = Some("idx2")),
                    fs => (fs.nestedData ~ (_.id)).hashed.index(),
-                   _.id.descending.index(name = Some("idx4"), unique = true, sparse = true)
+                   _.isActive.ascending.index(name = Some("idx4"), unique = true, sparse = true)
                  )
       indices <- collection.delegate(_.indexesManager.list())
     } yield {
@@ -114,7 +117,7 @@ class IndexDslTest extends CommonMongoSpec {
         idx.options shouldBe document
       }
       inside(indices.find(_.name.contains("idx4")).get) { idx =>
-        idx.key shouldBe List("id" -> IndexType.Descending)
+        idx.key shouldBe List("is_active" -> IndexType.Ascending)
         idx.unique shouldBe true
         idx.background shouldBe false
         idx.sparse shouldBe true

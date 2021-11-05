@@ -39,7 +39,11 @@ class DerivationMacros(val c: blackbox.Context) {
       naming: c.Expr[String => String]
   )(implicit w: c.WeakTypeTag[Data[Any]]): c.Expr[BSONField.Fields[Data]] = {
     val caseClass = collectCaseClassFields { sym =>
-      q"""BSONField($naming(${sym.name.decodedName.toString}))"""
+      if (sym.annotations.exists(_.tree.tpe =:= typeOf[mongo.hkd.oid])) {
+        q"""BSONField("_id")"""
+      } else {
+        q"""BSONField($naming(${sym.name.decodedName.toString}))"""
+      }
     }
 
     c.Expr[BSONField.Fields[Data]](

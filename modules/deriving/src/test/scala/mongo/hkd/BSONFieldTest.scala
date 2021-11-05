@@ -18,8 +18,10 @@ class BSONFieldTest extends AnyFreeSpec with Matchers {
       (BSONField.fields[Data].nestedData ~ (_.secondField)).fieldName should be("nested_data.second_field")
     }
     "codecs" in {
-      val data    = Data[Id](1, "name", Some("description"), true, NestedData[Id](UUID.randomUUID(), None))
+      val oid     = BSONObjectID.generate().stringify
+      val data    = Data[Id](oid, 1, "name", Some("description"), true, NestedData[Id](UUID.randomUUID(), None))
       val optData = Data[Option](
+        Some(data.oid),
         Some(data.id),
         Some(data.name),
         Some(data.description),
@@ -29,6 +31,7 @@ class BSONFieldTest extends AnyFreeSpec with Matchers {
 
       val bson = BSON.write(data).get
       pretty(bson) should be(s"""{
+                               |  '_id': '$oid',
                                |  'id': 1,
                                |  'name': 'name',
                                |  'description': 'description',

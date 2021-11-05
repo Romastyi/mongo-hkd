@@ -4,6 +4,8 @@ import reactivemongo.api.bson._
 
 import scala.util.Try
 
+final case class oid() extends scala.annotation.StaticAnnotation
+
 trait BSONField[A] {
   def fieldName: String
 }

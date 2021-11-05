@@ -6,6 +6,7 @@ import reactivemongo.api.bson._
 import java.util.UUID
 
 final case class Data[F[_]](
+    @oid oid: F[String],
     id: F[Int],
     name: F[String],
     description: F[Option[String]],
