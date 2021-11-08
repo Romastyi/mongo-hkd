@@ -31,31 +31,58 @@ final case class FieldComparison[A](field: BSONField[A], operator: String, wrapp
 
 trait QueryDsl extends QueryDslLowPriorityImplicits {
 
-  case class FindOperations[Data[f[_]]](builder: BSONCollection#QueryBuilder) {
+  case class FindOperations[Data[f[_]]](private val builder: BSONCollection#QueryBuilder) {
     def options(f: BSONCollection#QueryBuilder => BSONCollection#QueryBuilder): FindOperations[Data] =
       FindOperations(f(builder))
 
-    def one[F[_]](implicit ec: ExecutionContext, reader: BSONDocumentReader[Data[F]]): Future[Option[Data[F]]] =
-      builder.one[Data[F]]
+    def one[F[_]](implicit
+        ec: ExecutionContext,
+        readId: BSONReader[F[BSONObjectID]],
+        reader: BSONDocumentReader[Data[F]]
+    ): Future[Option[BSONRecord[Data, F]]] =
+      builder.one[BSONRecord[Data, F]]
+
     def one[F[_]](
         readPreference: ReadPreference
-    )(implicit ec: ExecutionContext, reader: BSONDocumentReader[Data[F]]): Future[Option[Data[F]]]             =
-      builder.one[Data[F]](readPreference)
+    )(implicit
+        ec: ExecutionContext,
+        readId: BSONReader[F[BSONObjectID]],
+        reader: BSONDocumentReader[Data[F]]
+    ): Future[Option[BSONRecord[Data, F]]] =
+      builder.one[BSONRecord[Data, F]](readPreference)
 
-    def requireOne[F[_]](implicit ec: ExecutionContext, reader: BSONDocumentReader[Data[F]]): Future[Data[F]] =
-      builder.requireOne[Data[F]]
+    def requireOne[F[_]](implicit
+        ec: ExecutionContext,
+        readId: BSONReader[F[BSONObjectID]],
+        reader: BSONDocumentReader[Data[F]]
+    ): Future[BSONRecord[Data, F]] =
+      builder.requireOne[BSONRecord[Data, F]]
+
     def requireOne[F[_]](
         readPreference: ReadPreference
-    )(implicit ec: ExecutionContext, reader: BSONDocumentReader[Data[F]]): Future[Data[F]]                    =
-      builder.requireOne[Data[F]](readPreference)
+    )(implicit
+        ec: ExecutionContext,
+        readId: BSONReader[F[BSONObjectID]],
+        reader: BSONDocumentReader[Data[F]]
+    ): Future[BSONRecord[Data, F]] =
+      builder.requireOne[BSONRecord[Data, F]](readPreference)
 
-    def cursor[F[_]](implicit reader: BSONDocumentReader[Data[F]]): WithOps[Data[F]]                                 =
-      builder.cursor[Data[F]]()
-    def cursor[F[_]](readPreference: ReadPreference)(implicit reader: BSONDocumentReader[Data[F]]): WithOps[Data[F]] =
-      builder.cursor[Data[F]](readPreference)
+    def cursor[F[_]](implicit
+        readId: BSONReader[F[BSONObjectID]],
+        reader: BSONDocumentReader[Data[F]]
+    ): WithOps[BSONRecord[Data, F]] =
+      builder.cursor[BSONRecord[Data, F]]()
+
+    def cursor[F[_]](
+        readPreference: ReadPreference
+    )(implicit
+        readId: BSONReader[F[BSONObjectID]],
+        reader: BSONDocumentReader[Data[F]]
+    ): WithOps[BSONRecord[Data, F]] =
+      builder.cursor[BSONRecord[Data, F]](readPreference)
   }
 
-  implicit class CollectionOperations[Data[f[_]]](collection: HKDBSONCollection[Data]) {
+  implicit class CollectionQueryOperations[Data[f[_]]](collection: HKDBSONCollection[Data]) {
     def findAll: FindOperations[Data]                                           =
       FindOperations(collection.delegate(_.find(document)))
     def findQuery(query: BSONField.Fields[Data] => Query): FindOperations[Data] =

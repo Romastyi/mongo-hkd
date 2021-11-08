@@ -12,19 +12,19 @@ import scala.language.postfixOps
 
 class QueryDslTest extends CommonMongoSpec {
 
-  val oid1  = BSONObjectID.generate().stringify
+  val oid1  = BSONObjectID.generate()
   val uuid1 = new UUID(0, 0)
-  val data1 = Data[Id](oid1, 1, "name1", Some("str"), true, NestedData[Id](uuid1, Some("field")))
-  val oid2  = BSONObjectID.generate().stringify
+  val data1 = Data[Id](1, "name1", Some("str"), true, NestedData[Id](uuid1, Some("field")))
+  val oid2  = BSONObjectID.generate()
   val uuid2 = new UUID(0, 1)
-  val data2 = Data[Id](oid2, 2, "name2", None, false, NestedData[Id](uuid2, None))
+  val data2 = Data[Id](2, "name2", None, false, NestedData[Id](uuid2, None))
 
   override def afterStart(): Unit = {
     Await.result(
       Future { Thread.sleep(10000) }.flatMap { _ =>
         withCollection[Data].apply { collection =>
           for {
-            _ <- collection.delegate(_.insert(false).many(Seq(data1, data2)))
+            _ <- collection.insert.many(data1, data2.record(oid2))
           } yield ()
         }
       },
@@ -150,17 +150,19 @@ class QueryDslTest extends CommonMongoSpec {
                     .cursor[Id]
                     .collect[List]()
       } yield {
-        found0 should be(data2 :: data1 :: Nil)
-        found1 should be(Some(data1))
-        found2 should be(Some(data2))
-        found3 should be(None)
-        found4 should be(data1 :: data2 :: Nil)
-        found5 should be(data2 :: Nil)
-        found6 should be(data1)
-        found7 should be(data1 :: data2 :: Nil)
-        found8 should be(data2 :: Nil)
-        found8 should be(data2 :: Nil)
-        found9 should be(data1 :: data2 :: Nil)
+        found0.map(_.data) should be(data2 :: data1 :: Nil)
+        found1.map(_._id) should not be Some(oid1)
+        found1.map(_.data) should be(Some(data1))
+        found2.map(_._id) should be(Some(oid2))
+        found2.map(_.data) should be(Some(data2))
+        found3.map(_.data) should be(None)
+        found4.map(_.data) should be(data1 :: data2 :: Nil)
+        found5.map(_.data) should be(data2 :: Nil)
+        found6.data should be(data1)
+        found7.map(_.data) should be(data1 :: data2 :: Nil)
+        found8.map(_.data) should be(data2 :: Nil)
+        found8.map(_.data) should be(data2 :: Nil)
+        found9.map(_.data) should be(data1 :: data2 :: Nil)
       }
     }
   }
