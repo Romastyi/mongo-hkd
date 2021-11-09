@@ -1,7 +1,7 @@
 package mongo.hkd
 
 import reactivemongo.api.bson.collection.BSONCollection
-import reactivemongo.api.bson.{BSON, BSONDocument, BSONDocumentWriter, BSONObjectID, BSONWriter}
+import reactivemongo.api.bson.{BSON, BSONDocument, BSONDocumentWriter, BSONObjectID}
 import reactivemongo.api.commands.WriteResult
 import reactivemongo.api.{DB, FailoverStrategy, WriteConcern}
 
@@ -17,8 +17,7 @@ final case class InsertDataWrapper[Data[f[_]], F[_]](data: Data[F], implicit val
 }
 final case class InsertRecordWrapper[Data[f[_]], F[_]](
     record: BSONRecord[Data, F],
-    implicit val writeId: BSONWriter[F[BSONObjectID]],
-    implicit val writer: BSONDocumentWriter[Data[F]]
+    implicit val writer: BSONDocumentWriter[BSONRecord[Data, F]]
 ) extends InsertWrapper[Data, F] {
   override def write: Try[BSONDocument] = BSON.writeDocument(record)
 }
@@ -29,12 +28,21 @@ object InsertWrapper {
   ): InsertWrapper[Data, F]                                                                              =
     InsertDataWrapper(data, writer)
   implicit def insertRecordWrapper[Data[f[_]], F[_]](record: BSONRecord[Data, F])(implicit
-      writeId: BSONWriter[F[BSONObjectID]],
-      writer: BSONDocumentWriter[Data[F]]
+      writer: BSONDocumentWriter[BSONRecord[Data, F]]
   ): InsertWrapper[Data, F]                                                                              =
-    InsertRecordWrapper(record, writeId, writer)
+    InsertRecordWrapper(record, writer)
   implicit def `BSONWriter[InsertWrapper]`[Data[f[_]], F[_]]: BSONDocumentWriter[InsertWrapper[Data, F]] =
     BSONDocumentWriter.from(_.write)
+}
+
+final case class InsertOperations[Data[f[_]], F[_]](private val builder: BSONCollection#InsertBuilder) {
+  def one(item: InsertWrapper[Data, F])(implicit ec: ExecutionContext): Future[WriteResult] =
+    builder.one(item)
+
+  def many(first: InsertWrapper[Data, F], second: InsertWrapper[Data, F], others: InsertWrapper[Data, F]*)(implicit
+      ec: ExecutionContext
+  ): Future[BSONCollection#MultiBulkWriteResult] =
+    builder.many(first +: second +: others)
 }
 
 trait CollectionDsl {
@@ -67,16 +75,6 @@ trait CollectionDsl {
         bypassDocumentValidation: Boolean
     ): InsertOperations[Data, F]                                                                     =
       InsertOperations(collection.delegate(_.insert(ordered, writeConcern, bypassDocumentValidation)))
-  }
-
-  case class InsertOperations[Data[f[_]], F[_]](private val builder: BSONCollection#InsertBuilder) {
-    def one(item: InsertWrapper[Data, F])(implicit ec: ExecutionContext): Future[WriteResult] =
-      builder.one(item)
-
-    def many(first: InsertWrapper[Data, F], second: InsertWrapper[Data, F], others: InsertWrapper[Data, F]*)(implicit
-        ec: ExecutionContext
-    ): Future[BSONCollection#MultiBulkWriteResult] =
-      builder.many(first +: second +: others)
   }
 
 }

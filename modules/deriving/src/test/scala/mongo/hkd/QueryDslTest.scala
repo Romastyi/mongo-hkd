@@ -114,7 +114,7 @@ class QueryDslTest extends CommonMongoSpec {
     "findQuery" in withCollection[Data].apply { collection =>
       for {
         found0  <- collection.findAll
-                     .options(_.sort(document("id" -> -1)))
+                     .sort(_.id.desc)
                      .cursor[Id]
                      .collect[List]()
         found1  <- collection
@@ -165,6 +165,63 @@ class QueryDslTest extends CommonMongoSpec {
         found8.map(_.data) should be(data2 :: Nil)
         found9.map(_.data) should be(data1 :: data2 :: Nil)
         found10.map(_.data) should be(data2 :: Nil)
+      }
+    }
+    "projection" in withCollection[Data].apply { collection =>
+      for {
+        found0 <- collection
+                    .findQuery(_.id $eq 2)
+                    .projection(_._id -> 1)
+                    .cursor[Option]
+                    .collect[List]()
+        found1 <- collection.findAll
+                    .projection(_._id -> 0, _.id -> 1)
+                    .cursor[Option]
+                    .collect[List]()
+        found2 <- collection.findAll
+                    .projection(_._id -> 0, _.id -> 1, _.nestedData -> 1)
+                    .cursor[Option]
+                    .collect[List]()
+        found3 <- collection.findAll
+                    .projection(_._id -> 0, _.id -> 1, _.nestedData ~ (_.id) -> 1)
+                    .cursor[Option]
+                    .collect[List]()
+      } yield {
+        found0 should be(
+          List(
+            BSONRecord[Data, Option](Some(oid2), Data[Option](None, None, None, None, None))
+          )
+        )
+        found1 should be(
+          List(
+            BSONRecord[Data, Option](None, Data[Option](Some(1), None, None, None, None)),
+            BSONRecord[Data, Option](None, Data[Option](Some(2), None, None, None, None))
+          )
+        )
+        found2 should be(
+          List(
+            BSONRecord[Data, Option](
+              None,
+              Data[Option](Some(1), None, None, None, Some(NestedData[Option](Some(uuid1), Some(Some("field")))))
+            ),
+            BSONRecord[Data, Option](
+              None,
+              Data[Option](Some(2), None, None, None, Some(NestedData[Option](Some(uuid2), None)))
+            )
+          )
+        )
+        found3 should be(
+          List(
+            BSONRecord[Data, Option](
+              None,
+              Data[Option](Some(1), None, None, None, Some(NestedData[Option](Some(uuid1), None)))
+            ),
+            BSONRecord[Data, Option](
+              None,
+              Data[Option](Some(2), None, None, None, Some(NestedData[Option](Some(uuid2), None)))
+            )
+          )
+        )
       }
     }
   }

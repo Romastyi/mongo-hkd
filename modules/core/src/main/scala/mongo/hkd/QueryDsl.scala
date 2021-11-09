@@ -5,6 +5,7 @@ import reactivemongo.api.ReadPreference
 import reactivemongo.api.bson._
 import reactivemongo.api.bson.collection.BSONCollection
 
+import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
 sealed trait BSONValueWrapper {
@@ -29,64 +30,98 @@ final case class FieldComparison[A](field: BSONField[A], operator: String, wrapp
   def bson: BSONDocument = document(field.fieldName -> expr)
 }
 
+final case class QueryOperations[Data[f[_]]](
+    private val builder: BSONCollection#QueryBuilder,
+    private val fields: Record.RecordFields[Data]
+) {
+  private def options(f: BSONCollection#QueryBuilder => BSONCollection#QueryBuilder): QueryOperations[Data] =
+    QueryOperations(f(builder), fields)
+
+  def projection(projections: (Record.RecordFields[Data] => QueryProjection)*): QueryOperations[Data] =
+    options(_.projection(projections.map(_.apply(fields))))
+
+  def sort(soring: (Record.RecordFields[Data] => QuerySort)*): QueryOperations[Data] =
+    options(_.sort(BSON.writeDocument(soring.map(_.apply(fields))).get))
+
+  def one[F[_]](implicit
+      ec: ExecutionContext,
+      reader: BSONDocumentReader[BSONRecord[Data, F]]
+  ): Future[Option[BSONRecord[Data, F]]] =
+    builder.one[BSONRecord[Data, F]]
+
+  def one[F[_]](
+      readPreference: ReadPreference
+  )(implicit
+      ec: ExecutionContext,
+      reader: BSONDocumentReader[BSONRecord[Data, F]]
+  ): Future[Option[BSONRecord[Data, F]]] =
+    builder.one[BSONRecord[Data, F]](readPreference)
+
+  def requireOne[F[_]](implicit
+      ec: ExecutionContext,
+      reader: BSONDocumentReader[BSONRecord[Data, F]]
+  ): Future[BSONRecord[Data, F]] =
+    builder.requireOne[BSONRecord[Data, F]]
+
+  def requireOne[F[_]](
+      readPreference: ReadPreference
+  )(implicit
+      ec: ExecutionContext,
+      reader: BSONDocumentReader[BSONRecord[Data, F]]
+  ): Future[BSONRecord[Data, F]] =
+    builder.requireOne[BSONRecord[Data, F]](readPreference)
+
+  def cursor[F[_]](implicit reader: BSONDocumentReader[BSONRecord[Data, F]]): WithOps[BSONRecord[Data, F]] =
+    builder.cursor[BSONRecord[Data, F]]()
+
+  def cursor[F[_]](readPreference: ReadPreference)(implicit
+      reader: BSONDocumentReader[BSONRecord[Data, F]]
+  ): WithOps[BSONRecord[Data, F]] =
+    builder.cursor[BSONRecord[Data, F]](readPreference)
+}
+
+sealed trait QueryProjection
+final case class FieldIncluded[A](field: BSONField[A]) extends QueryProjection
+final case class FieldExcluded[A](field: BSONField[A]) extends QueryProjection
+
+object QueryProjection {
+  implicit val `BSONWriter[QueryProjection]` : BSONDocumentWriter[Seq[QueryProjection]] = BSONDocumentWriter { xs =>
+    document(xs.map {
+      case FieldIncluded(field) => BSONElement(field.fieldName, 1)
+      case FieldExcluded(field) => BSONElement(field.fieldName, 0)
+    }: _*)
+  }
+}
+
+sealed trait QuerySort
+final case class FieldAscending[A](field: BSONField[A])  extends QuerySort
+final case class FieldDescending[A](field: BSONField[A]) extends QuerySort
+
+object QuerySort {
+  implicit val `BSONWriter[QuerySort]` : BSONDocumentWriter[Seq[QuerySort]] = BSONDocumentWriter { xs =>
+    document(xs.map {
+      case FieldAscending(field)  => BSONElement(field.fieldName, 1)
+      case FieldDescending(field) => BSONElement(field.fieldName, -1)
+    }: _*)
+  }
+}
+
 trait QueryDsl extends QueryDslLowPriorityImplicits {
 
-  case class FindOperations[Data[f[_]]](private val builder: BSONCollection#QueryBuilder) {
-    def options(f: BSONCollection#QueryBuilder => BSONCollection#QueryBuilder): FindOperations[Data] =
-      FindOperations(f(builder))
+  @nowarn("msg=is never used")
+  implicit class FieldOptions[A](private val field: BSONField[A]) {
+    def ->[W <: 1](w: W): QueryProjection                  = FieldIncluded(field)
+    def ->[W <: 0](w: W, unit: Unit = ()): QueryProjection = FieldExcluded(field)
 
-    def one[F[_]](implicit
-        ec: ExecutionContext,
-        readId: BSONReader[F[BSONObjectID]],
-        reader: BSONDocumentReader[Data[F]]
-    ): Future[Option[BSONRecord[Data, F]]] =
-      builder.one[BSONRecord[Data, F]]
-
-    def one[F[_]](
-        readPreference: ReadPreference
-    )(implicit
-        ec: ExecutionContext,
-        readId: BSONReader[F[BSONObjectID]],
-        reader: BSONDocumentReader[Data[F]]
-    ): Future[Option[BSONRecord[Data, F]]] =
-      builder.one[BSONRecord[Data, F]](readPreference)
-
-    def requireOne[F[_]](implicit
-        ec: ExecutionContext,
-        readId: BSONReader[F[BSONObjectID]],
-        reader: BSONDocumentReader[Data[F]]
-    ): Future[BSONRecord[Data, F]] =
-      builder.requireOne[BSONRecord[Data, F]]
-
-    def requireOne[F[_]](
-        readPreference: ReadPreference
-    )(implicit
-        ec: ExecutionContext,
-        readId: BSONReader[F[BSONObjectID]],
-        reader: BSONDocumentReader[Data[F]]
-    ): Future[BSONRecord[Data, F]] =
-      builder.requireOne[BSONRecord[Data, F]](readPreference)
-
-    def cursor[F[_]](implicit
-        readId: BSONReader[F[BSONObjectID]],
-        reader: BSONDocumentReader[Data[F]]
-    ): WithOps[BSONRecord[Data, F]] =
-      builder.cursor[BSONRecord[Data, F]]()
-
-    def cursor[F[_]](
-        readPreference: ReadPreference
-    )(implicit
-        readId: BSONReader[F[BSONObjectID]],
-        reader: BSONDocumentReader[Data[F]]
-    ): WithOps[BSONRecord[Data, F]] =
-      builder.cursor[BSONRecord[Data, F]](readPreference)
+    def asc: QuerySort  = FieldAscending(field)
+    def desc: QuerySort = FieldDescending(field)
   }
 
   implicit class CollectionQueryOperations[Data[f[_]]](collection: HKDBSONCollection[Data]) {
-    def findAll: FindOperations[Data]                                              =
-      FindOperations(collection.delegate(_.find(document)))
-    def findQuery(query: Record.RecordFields[Data] => Query): FindOperations[Data] =
-      FindOperations(collection.delegate(_.find(query(collection.fields).bson)))
+    def findAll: QueryOperations[Data]                                              =
+      QueryOperations(collection.delegate(_.find(document)), collection.fields)
+    def findQuery(query: Record.RecordFields[Data] => Query): QueryOperations[Data] =
+      QueryOperations(collection.delegate(_.find(query(collection.fields).bson)), collection.fields)
   }
 
   implicit class LogicalOperators[A <: Query](left: A) {

@@ -2,6 +2,7 @@ package mongo.hkd
 
 import reactivemongo.api.bson._
 
+import scala.reflect.{ClassTag, classTag}
 import scala.util.Try
 
 trait BSONField[A] {
@@ -35,9 +36,9 @@ object BSONField extends HighPriorityImplicits {
 trait HighPriorityImplicits extends LowPriorityImplicits {
 
   implicit class BSONFieldHKDCodecs[Data[f[_]]](field: BSONField[Data[BSONField]]) {
-    def read[F[_]](bson: BSONDocument)(implicit r: BSONReader[F[Data[F]]]): Try[F[Data[F]]]          =
-      bson.getAsTry[F[Data[F]]](field.fieldName)
-    def write[F[_]](value: F[Data[F]])(implicit w: BSONWriter[F[Data[F]]]): Try[(String, BSONValue)] =
+    def read[F[_]](bson: BSONDocument)(implicit r: BSONReader[F[Data[F]]], ct: ClassTag[F[Data[F]]]): Try[F[Data[F]]] =
+      readOptional[F[Data[F]]](field, bson)
+    def write[F[_]](value: F[Data[F]])(implicit w: BSONWriter[F[Data[F]]]): Try[(String, BSONValue)]                  =
       w.writeTry(value).map(field.fieldName -> _)
   }
 
@@ -50,10 +51,22 @@ trait HighPriorityImplicits extends LowPriorityImplicits {
 
 trait LowPriorityImplicits {
 
+  protected def readOptional[A](field: BSONField[_], bson: BSONDocument)(implicit
+      r: BSONReader[A],
+      ct: ClassTag[A]
+  ): Try[A] = {
+    // TODO Make without reflection
+    if (ct.runtimeClass.isAssignableFrom(classTag[Option[A]].runtimeClass)) {
+      r.readTry(bson.get(field.fieldName).getOrElse(BSONNull))
+    } else {
+      bson.getAsTry[A](field.fieldName)
+    }
+  }
+
   implicit class BSONFieldCodecs[A](field: BSONField[A]) {
-    def read[F[_]](bson: BSONDocument)(implicit r: BSONReader[F[A]]): Try[F[A]]          =
-      bson.getAsTry[F[A]](field.fieldName)
-    def write[F[_]](value: F[A])(implicit w: BSONWriter[F[A]]): Try[(String, BSONValue)] =
+    def read[F[_]](bson: BSONDocument)(implicit r: BSONReader[F[A]], ct: ClassTag[F[A]]): Try[F[A]] =
+      readOptional[F[A]](field, bson)
+    def write[F[_]](value: F[A])(implicit w: BSONWriter[F[A]]): Try[(String, BSONValue)]            =
       w.writeTry(value).map(field.fieldName -> _)
   }
 
