@@ -113,42 +113,43 @@ class QueryDslTest extends CommonMongoSpec {
     }
     "findQuery" in withCollection[Data].apply { collection =>
       for {
-        found0 <- collection.findAll
-                    .options(_.sort(document("id" -> -1)))
-                    .cursor[Id]
-                    .collect[List]()
-        found1 <- collection
-                    .findQuery(_.id $eq 1)
-                    .one[Id]
-        found2 <- collection
-                    .findQuery(_.id $eq 2)
-                    .one[Id]
-        found3 <- collection
-                    .findQuery(_.id $eq 3)
-                    .one[Id]
-        found4 <- collection
-                    .findQuery(_.name $regex """(name)\d?""")
-                    .cursor[Id]
-                    .collect[List]()
-        found5 <- collection
-                    .findQuery(fs => (fs.name $regex """(name)\d?""") $and (fs.description $eq None))
-                    .cursor[Id]
-                    .collect[List]()
-        found6 <- collection
-                    .findQuery(_.nestedData m data1.nestedData)
-                    .requireOne[Id]
-        found7 <- collection
-                    .findQuery(_.nestedData ~ (_.id) $in (uuid1, uuid2))
-                    .cursor[Id]
-                    .collect[List]()
-        found8 <- collection
-                    .findQuery(_.nestedData ~ (_.id) $not (_ $eq uuid1))
-                    .cursor[Id]
-                    .collect[List]()
-        found9 <- collection
-                    .findQuery(fs => (fs.id $eq 1) $or (fs.nestedData m data2.nestedData))
-                    .cursor[Id]
-                    .collect[List]()
+        found0  <- collection.findAll
+                     .options(_.sort(document("id" -> -1)))
+                     .cursor[Id]
+                     .collect[List]()
+        found1  <- collection
+                     .findQuery(_.id $eq 1)
+                     .one[Id]
+        found2  <- collection
+                     .findQuery(_.id $eq 2)
+                     .one[Id]
+        found3  <- collection
+                     .findQuery(_.id $eq 3)
+                     .one[Id]
+        found4  <- collection
+                     .findQuery(_.name $regex """(name)\d?""")
+                     .cursor[Id]
+                     .collect[List]()
+        found5  <- collection
+                     .findQuery(fs => (fs.name $regex """(name)\d?""") $and (fs.description $eq None))
+                     .cursor[Id]
+                     .collect[List]()
+        found6  <- collection
+                     .findQuery(_.nestedData m data1.nestedData)
+                     .requireOne[Id]
+        found7  <- collection
+                     .findQuery(_.nestedData ~ (_.id) $in (uuid1, uuid2))
+                     .cursor[Id]
+                     .collect[List]()
+        found8  <- collection
+                     .findQuery(_.nestedData ~ (_.id) $not (_ $eq uuid1))
+                     .cursor[Id]
+                     .collect[List]()
+        found9  <- collection
+                     .findQuery(fs => (fs.id $eq 1) $or (fs.nestedData m data2.nestedData))
+                     .cursor[Id]
+                     .collect[List]()
+        found10 <- collection.findQuery(_._id $in (oid1, oid2)).cursor[Id].collect[List]()
       } yield {
         found0.map(_.data) should be(data2 :: data1 :: Nil)
         found1.map(_._id) should not be Some(oid1)
@@ -163,6 +164,7 @@ class QueryDslTest extends CommonMongoSpec {
         found8.map(_.data) should be(data2 :: Nil)
         found8.map(_.data) should be(data2 :: Nil)
         found9.map(_.data) should be(data1 :: data2 :: Nil)
+        found10.map(_.data) should be(data2 :: Nil)
       }
     }
   }

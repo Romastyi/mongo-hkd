@@ -83,9 +83,9 @@ trait QueryDsl extends QueryDslLowPriorityImplicits {
   }
 
   implicit class CollectionQueryOperations[Data[f[_]]](collection: HKDBSONCollection[Data]) {
-    def findAll: FindOperations[Data]                                           =
+    def findAll: FindOperations[Data]                                              =
       FindOperations(collection.delegate(_.find(document)))
-    def findQuery(query: BSONField.Fields[Data] => Query): FindOperations[Data] =
+    def findQuery(query: Record.RecordFields[Data] => Query): FindOperations[Data] =
       FindOperations(collection.delegate(_.find(query(collection.fields).bson)))
   }
 

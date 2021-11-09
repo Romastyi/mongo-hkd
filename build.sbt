@@ -8,7 +8,8 @@ lazy val core = (project in file("modules") / "core")
     scalafmtOnCompile := true,
     libraryDependencies ++= Seq(
       "org.reactivemongo" %% "reactivemongo" % "1.0.7",
-      "org.scalatest"     %% "scalatest"     % "3.2.9" % Test
+      "org.scalatest"     %% "scalatest"     % "3.2.9" % Test,
+      compilerPlugin("org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full)
     )
   )
 

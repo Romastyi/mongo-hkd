@@ -10,9 +10,9 @@ class IndexDslTest extends CommonMongoSpec {
   "ensureIndices(...)" in withCollection[Data].apply { collection =>
     for {
       _       <- collection.ensureIndices(
-//                   _.oid.ascending.index(name =
-//                     Some("idx0")
-//                   ), // Will not create any additional index, only duplicates the default index by `_id` field.
+                   _._id.ascending.index(name =
+                     Some("idx0")
+                   ), // Will not create any additional index, only duplicates the default index by `_id` field.
                    _.name.hashed.index(name = Some("idx1")),
                    fs => List(fs.name.text.weight(10), fs.description.text).index(name = Some("idx2")),
                    fs => (fs.nestedData ~ (_.id)).hashed.index(),

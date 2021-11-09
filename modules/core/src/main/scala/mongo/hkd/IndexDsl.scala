@@ -2,7 +2,7 @@ package mongo.hkd
 
 import reactivemongo.api.Collation
 import reactivemongo.api.bson.collection.BSONSerializationPack
-import reactivemongo.api.bson.{BSONDocument, BSONElement, document}
+import reactivemongo.api.bson.{BSONDocument, BSONElement, BSONObjectID, document}
 import reactivemongo.api.indexes.{Index, IndexType}
 
 import scala.annotation.nowarn
@@ -37,9 +37,10 @@ object ScalaTypeMongoIndexTypeMapping {
       mapping: ScalaTypeMongoIndexTypeMapping[A, T]
   ): ScalaTypeMongoIndexTypeMapping[List[A], T]   = null
 
-  implicit def stringText: Text[String]                = text
-  implicit def defaultOrdered[A: Ordering]: Ordered[A] = ordered
-  implicit def anyToIndexType[A]: Hashed[A]            = hashed
+  implicit def stringText: Text[String]                   = text
+  implicit def defaultOrdered[A: Ordering]: Ordered[A]    = ordered
+  implicit val bsonObjectIdOrdered: Ordered[BSONObjectID] = ordered
+  implicit def anyToIndexType[A]: Hashed[A]               = hashed
 
 }
 
@@ -242,8 +243,8 @@ trait IndexDsl extends IndexDslLowPriorityImplicits {
 
   implicit class IndexOps[Data[f[_]]](collection: HKDBSONCollection[Data]) {
     def ensureIndices(
-        index: BSONField.Fields[Data] => IndexBuilder,
-        others: (BSONField.Fields[Data] => IndexBuilder)*
+        index: Record.RecordFields[Data] => IndexBuilder,
+        others: (Record.RecordFields[Data] => IndexBuilder)*
     )(implicit ec: ExecutionContext): Future[Unit] = {
       val manager = collection.delegate(_.indexesManager)
       Future
