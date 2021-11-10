@@ -39,10 +39,10 @@ final case class InsertOperations[Data[f[_]], F[_]](private val builder: BSONCol
   def one(item: InsertWrapper[Data, F])(implicit ec: ExecutionContext): Future[WriteResult] =
     builder.one(item)
 
-  def many(first: InsertWrapper[Data, F], second: InsertWrapper[Data, F], others: InsertWrapper[Data, F]*)(implicit
+  def many(first: InsertWrapper[Data, F], others: InsertWrapper[Data, F]*)(implicit
       ec: ExecutionContext
   ): Future[BSONCollection#MultiBulkWriteResult] =
-    builder.many(first +: second +: others)
+    builder.many(first +: others)
 }
 
 trait CollectionDsl {

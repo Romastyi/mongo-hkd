@@ -13,7 +13,7 @@ abstract class CommonMongoSpec extends AsyncFreeSpec with Matchers with ForAllTe
 
   override implicit def executionContext: ExecutionContext = ExecutionContext.global
 
-  override val container: MongoDBContainer = MongoDBContainer(DockerImageName.parse("mongo:4.2.3"))
+  override val container: MongoDBContainer = MongoDBContainer(DockerImageName.parse("mongo:5.0.3"))
 
   class CollectionApply[HKD[f[_]]](collection: Future[HKDBSONCollection[HKD]]) {
     def apply[A](body: HKDBSONCollection[HKD] => Future[A]): Future[A] = collection.flatMap(body)

@@ -6,6 +6,7 @@ import reactivemongo.api.bson.{BSONDocument, BSONElement, BSONObjectID, document
 import reactivemongo.api.indexes.{Index, IndexType}
 
 import scala.annotation.nowarn
+import scala.collection.Factory
 import scala.concurrent.{ExecutionContext, Future}
 
 sealed trait ScalaTypeMongoIndexTypeMapping[A, T <: IndexType]
@@ -33,9 +34,10 @@ object ScalaTypeMongoIndexTypeMapping {
   implicit def optionMapping[T <: IndexType, A](implicit
       mapping: ScalaTypeMongoIndexTypeMapping[A, T]
   ): ScalaTypeMongoIndexTypeMapping[Option[A], T] = null
-  implicit def arrayMapping[T <: IndexType, A](implicit
+  implicit def arrayMapping[T <: IndexType, A, M[_]](implicit
+      f: Factory[A, M[A]],
       mapping: ScalaTypeMongoIndexTypeMapping[A, T]
-  ): ScalaTypeMongoIndexTypeMapping[List[A], T]   = null
+  ): ScalaTypeMongoIndexTypeMapping[M[A], T]      = null
 
   implicit def stringText: Text[String]                   = text
   implicit def defaultOrdered[A: Ordering]: Ordered[A]    = ordered

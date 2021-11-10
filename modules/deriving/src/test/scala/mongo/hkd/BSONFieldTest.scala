@@ -17,15 +17,22 @@ class BSONFieldTest extends AnyFreeSpec with Matchers {
       (BSONField.fields[Data].nestedData ~ (_.id)).fieldName should be("nested_data.id")
       BSONField.fields[Data].nestedData.nested(_.secondField).fieldName should be("nested_data.second_field")
       (BSONField.fields[Data].nestedData ~ (_.secondField)).fieldName should be("nested_data.second_field")
+      (BSONField.fields[Data].otherData ~ (_.id)).fieldName should be("other_data.id")
+      (BSONField.fields[Data].otherData ~ (_.secondField)).fieldName should be("other_data.second_field")
     }
     "codecs" in {
-      val data    = Data[Id](1, "name", Some("description"), true, NestedData[Id](UUID.randomUUID(), None))
-      val optData = Data[Option](
+      val nested    = NestedData[Id](UUID.randomUUID(), None)
+      val data      =
+        Data[Id](1, "name", Some("description"), true, List("tag1", "tag2"), nested, List(nested))
+      val optNested = NestedData[Option](Some(nested.id), None)
+      val optData   = Data[Option](
         Some(data.id),
         Some(data.name),
         Some(data.description),
         Some(data.isActive),
-        Some(NestedData[Option](Some(data.nestedData.id), None))
+        Some(data.tags),
+        Some(optNested),
+        Some(List(optNested))
       )
 
       val bson = BSON.write(data).get
@@ -34,10 +41,20 @@ class BSONFieldTest extends AnyFreeSpec with Matchers {
                                |  'name': 'name',
                                |  'description': 'description',
                                |  'is_active': true,
+                               |  'tags': [
+                               |    'tag1',
+                               |    'tag2'
+                               |  ],
                                |  'nested_data': {
-                               |    'id': '${data.nestedData.id}',
+                               |    'id': '${nested.id}',
                                |    'second_field': null
-                               |  }
+                               |  },
+                               |  'other_data': [
+                               |    {
+                               |      'id': '${nested.id}',
+                               |      'second_field': null
+                               |    }
+                               |  ]
                                |}""".stripMargin)
       BSON.read[Data[Id]](bson).get should be(data)
       BSON.read[Data[Option]](bson).get should be(optData)
@@ -47,14 +64,19 @@ class BSONFieldTest extends AnyFreeSpec with Matchers {
 
   "BSONRecord" - {
     "codecs" in {
-      val oid     = BSONObjectID.generate()
-      val data    = Data[Id](1, "name", Some("description"), true, NestedData[Id](UUID.randomUUID(), None)).record(oid)
-      val optData = Data[Option](
+      val oid       = BSONObjectID.generate()
+      val nested    = NestedData[Id](UUID.randomUUID(), None)
+      val data      =
+        Data[Id](1, "name", Some("description"), true, List("tag1", "tag2"), nested, List(nested)).record(oid)
+      val optNested = NestedData[Option](Some(data.data.nestedData.id), None)
+      val optData   = Data[Option](
         Some(data.data.id),
         Some(data.data.name),
         Some(data.data.description),
         Some(data.data.isActive),
-        Some(NestedData[Option](Some(data.data.nestedData.id), None))
+        Some(data.data.tags),
+        Some(optNested),
+        Some(List(optNested))
       ).record(Some(oid))
 
       val bson = BSON.write(data).get
@@ -64,10 +86,20 @@ class BSONFieldTest extends AnyFreeSpec with Matchers {
                                 |  'name': 'name',
                                 |  'description': 'description',
                                 |  'is_active': true,
+                                |  'tags': [
+                                |    'tag1',
+                                |    'tag2'
+                                |  ],
                                 |  'nested_data': {
-                                |    'id': '${data.data.nestedData.id}',
+                                |    'id': '${nested.id}',
                                 |    'second_field': null
-                                |  }
+                                |  },
+                                |  'other_data': [
+                                |    {
+                                |      'id': '${nested.id}',
+                                |      'second_field': null
+                                |    }
+                                |  ]
                                 |}""".stripMargin)
       BSON.read[Data[Id]](bson).get should be(data.data)
       BSON.read[BSONRecord[Data, Id]](bson).get should be(data)

@@ -2,6 +2,7 @@ package mongo.hkd
 
 import reactivemongo.api.bson._
 
+import scala.collection.Factory
 import scala.reflect.{ClassTag, classTag}
 import scala.util.Try
 
@@ -13,20 +14,27 @@ object BSONField extends HighPriorityImplicits {
 
   type Fields[Data[f[_]]] = Data[BSONField]
 
-  private case class Impl[A](override val fieldName: String)           extends BSONField[A]
-  private case class Nested[A](baseName: String, nested: BSONField[A]) extends BSONField[A] {
-    override val fieldName: String = s"""$baseName.${nested.fieldName}"""
+  private case class Impl[A](override val fieldName: String)                extends BSONField[A]
+  private case class Nested[A, B](base: BSONField[A], nested: BSONField[B]) extends BSONField[B] {
+    override val fieldName: String = s"""${base.fieldName}.${nested.fieldName}"""
   }
 
   def apply[A](fieldName: String): BSONField[A] = Impl(fieldName)
 
   def fields[Data[f[_]]](implicit inst: Fields[Data]): Fields[Data] = inst
 
-  implicit class BSONFieldSyntax[Data[f[_]]](private val data: BSONField[Data[BSONField]]) extends AnyVal {
-    def nested[A](accessor: Data[BSONField] => BSONField[A])(implicit f: Fields[Data]): BSONField[A] =
-      Nested(data.fieldName, accessor(f))
+  implicit class ArrayFieldSyntax[Data[f[_]], M[_]](field: BSONField[M[Data[BSONField]]])(implicit
+      f: Factory[Data[BSONField], M[Data[BSONField]]]
+  ) {
+    def ~[A](accessor: Fields[Data] => BSONField[A])(implicit f: Fields[Data]): BSONField[A] =
+      Nested(field, accessor(f))
+  }
 
-    @inline def ~[A](accessor: Data[BSONField] => BSONField[A])(implicit f: Fields[Data]): BSONField[A] = nested(
+  implicit class BSONFieldSyntax[Data[f[_]]](val field: BSONField[Data[BSONField]]) extends AnyVal {
+    def nested[A](accessor: Fields[Data] => BSONField[A])(implicit f: Fields[Data]): BSONField[A] =
+      Nested(field, accessor(f))
+
+    @inline def ~[A](accessor: Fields[Data] => BSONField[A])(implicit f: Fields[Data]): BSONField[A] = nested(
       accessor
     )
   }
@@ -34,6 +42,17 @@ object BSONField extends HighPriorityImplicits {
 }
 
 trait HighPriorityImplicits extends LowPriorityImplicits {
+
+  implicit class BSONFieldHKDCollectionCodecs[Data[f[_]], M[_]](field: BSONField[M[Data[BSONField]]])(implicit
+      f: Factory[Data[BSONField], M[Data[BSONField]]]
+  ) {
+    def read[F[_]](
+        bson: BSONDocument
+    )(implicit r: BSONReader[F[M[Data[F]]]], ct: ClassTag[F[M[Data[F]]]]): Try[F[M[Data[F]]]]              =
+      readOptional[F[M[Data[F]]]](field, bson)
+    def write[F[_]](value: F[M[Data[F]]])(implicit w: BSONWriter[F[M[Data[F]]]]): Try[(String, BSONValue)] =
+      w.writeTry(value).map(field.fieldName -> _)
+  }
 
   implicit class BSONFieldHKDCodecs[Data[f[_]]](field: BSONField[Data[BSONField]]) {
     def read[F[_]](bson: BSONDocument)(implicit r: BSONReader[F[Data[F]]], ct: ClassTag[F[Data[F]]]): Try[F[Data[F]]] =

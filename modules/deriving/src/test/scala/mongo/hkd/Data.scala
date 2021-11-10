@@ -10,7 +10,9 @@ final case class Data[F[_]](
     name: F[String],
     description: F[Option[String]],
     isActive: F[Boolean],
-    nestedData: F[NestedData[F]]
+    tags: F[List[String]],
+    nestedData: F[NestedData[F]],
+    otherData: F[List[NestedData[F]]]
 )
 
 object Data
