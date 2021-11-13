@@ -6,7 +6,6 @@ import reactivemongo.api.bson._
 import reactivemongo.api.bson.collection.BSONCollection
 
 import scala.annotation.nowarn
-import scala.collection.Factory
 import scala.concurrent.{ExecutionContext, Future}
 
 sealed trait BSONValueWrapper {
@@ -47,8 +46,7 @@ final case class FieldComparison[A](override val field: BSONField[A], operator: 
   override def expr: BSONDocument = document(operator -> wrapper.bson)
 }
 
-final case class ElemMatch[Data[f[_]], M[_]](override val field: BSONField[M[Data[BSONField]]], query: Query)
-    extends QueryExpr[M[Data[BSONField]]] {
+final case class ElemMatch[A](override val field: BSONField[A], query: Query) extends QueryExpr[A] {
   override def expr: BSONDocument = document("$elemMatch" -> query.bson)
 }
 
@@ -116,10 +114,10 @@ final case class QueryOperations[Data[f[_]]](
 }
 
 sealed trait QueryProjection
-final case class FieldIncluded[A](field: BSONField[A])                                extends QueryProjection
-final case class FieldExcluded[A](field: BSONField[A])                                extends QueryProjection
-final case class FieldArraySlice[A](field: BSONField[A], n: Int, skip: Option[Int])   extends QueryProjection
-final case class FieldArrayElemMatch[Data[f[_]], M[_]](elemMatch: ElemMatch[Data, M]) extends QueryProjection
+final case class FieldIncluded[A](field: BSONField[A])                              extends QueryProjection
+final case class FieldExcluded[A](field: BSONField[A])                              extends QueryProjection
+final case class FieldArraySlice[A](field: BSONField[A], n: Int, skip: Option[Int]) extends QueryProjection
+final case class FieldArrayElemMatch[A](elemMatch: ElemMatch[A])                    extends QueryProjection
 
 object QueryProjection {
   implicit val `BSONWriter[QueryProjection]` : BSONDocumentWriter[Seq[QueryProjection]] = BSONDocumentWriter { xs =>
@@ -162,8 +160,10 @@ trait QueryDsl extends QueryDslLowPriorityImplicits {
     def $or[B <: Query](right: B): LogicalOperator[A, B]  = LogicalOperator(left, right, "$or")
   }
 
-  implicit class NestedFieldMatches[Data[f[_]]](field: BSONField[Data[BSONField]]) {
-    def m[F[_]](value: Data[F])(implicit w: BSONWriter[Data[F]]): FieldMatchExpr[Data[BSONField]] =
+  implicit class NestedFieldMatches[A, Data[f[_]]](field: BSONField[A])(implicit
+      f: DerivedFieldType.Nested[A, Data]
+  ) {
+    def m[F[_]](value: Data[F])(implicit w: BSONWriter[Data[F]]): FieldMatchExpr[A] =
       FieldMatchExpr(field, w.writeTry(value).get)
   }
 
@@ -175,21 +175,22 @@ trait QueryDsl extends QueryDslLowPriorityImplicits {
       FieldComparison(field, f"""$$regex""", BSONRegex(regex, flags))
   }
 
-  implicit def arrayComparisons[A, M[_]](field: BSONField[M[A]])(implicit
-      f: Factory[A, M[A]],
-      w: BSONWriter[A]
-  ): FieldComparisonOperators[M[A], A] = FieldComparisonOperators(field)
+  implicit def arrayComparisons[A, T](field: BSONField[A])(implicit
+      f: DerivedFieldType.Array[A, T],
+      w: BSONWriter[T]
+  ): FieldComparisonOperators[A, T] = FieldComparisonOperators(field)
 
-  implicit class ArrayFieldNestedDocumentQueryOps[M[_], Data[f[_]]](field: BSONField[M[Data[BSONField]]])(implicit
+  implicit class ArrayFieldNestedDocumentQueryOps[A, Data[f[_]]](field: BSONField[A])(implicit
+      w: DerivedFieldType.Array[A, Data[BSONField]],
       fields: BSONField.Fields[Data]
   ) {
     def $all(
-        elem: BSONField[M[Data[BSONField]]] => ElemMatch[Data, M],
-        elems: (BSONField[M[Data[BSONField]]] => ElemMatch[Data, M])*
-    ): FieldComparison[M[Data[BSONField]]]                                     =
+        elem: BSONField[A] => ElemMatch[A],
+        elems: (BSONField[A] => ElemMatch[A])*
+    ): FieldComparison[A]                                                =
       FieldComparison(field, "$all", (elem +: elems).map(_.apply(field)).map(_.expr))
-    def $size(size: Int): FieldComparison[M[Data[BSONField]]]                  = FieldComparison(field, f"$$size", size)
-    def $elemMatch(query: BSONField.Fields[Data] => Query): ElemMatch[Data, M] = ElemMatch(field, query(fields))
+    def $size(size: Int): FieldComparison[A]                             = FieldComparison(field, f"$$size", size)
+    def $elemMatch(query: BSONField.Fields[Data] => Query): ElemMatch[A] = ElemMatch(field, query(fields))
   }
 
 }
@@ -208,14 +209,6 @@ trait QueryDslLowPriorityImplicits {
   implicit def comparisons[A](field: BSONField[A])(implicit w: BSONWriter[A]): FieldComparisonOperators[A, A] =
     FieldComparisonOperators(field)
 
-  implicit class ArrayFieldsQueryOperators[M[_], A](field: BSONField[M[A]])(implicit
-      f: Factory[A, M[A]],
-      w: BSONWriter[A]
-  ) {
-    def $all(value: A, others: A*): FieldComparison[M[A]] = FieldComparison(field, "$all", value +: others)
-    def $size(size: Int): FieldComparison[M[A]]           = FieldComparison(field, f"$$size", size)
-  }
-
   implicit class FieldSimpleProjects[A](field: BSONField[A]) {
     def ->(w: 1): QueryProjection                  = FieldIncluded(field)
     def ->(w: 0, unit: Unit = ()): QueryProjection = FieldExcluded(field)
@@ -224,17 +217,24 @@ trait QueryDslLowPriorityImplicits {
     def desc: QuerySort                            = FieldDescending(field)
   }
 
-  final class PositionalArrayFieldOps[M[_], A](field: BSONField[M[A]]) {
+  final class PositionalArrayFieldOps[A](field: BSONField[A]) {
     def ->(w: 1): QueryProjection = FieldIncluded(field)
   }
 
-  implicit class ArrayFieldSimpleProjections[M[_], A](field: BSONField[M[A]])(implicit f: Factory[A, M[A]]) {
-    def $ : PositionalArrayFieldOps[M, A]         = new PositionalArrayFieldOps(BSONField(s"${field.fieldName}.$$"))
+  implicit class ArrayFieldsOperators[A, T](field: BSONField[A])(implicit f: DerivedFieldType.Array[A, T]) {
+    // Query
+    def $all(value: T, others: T*)(implicit
+        w: BSONWriter[T]
+    ): FieldComparison[A]                    = FieldComparison(field, "$all", value +: others)
+    def $size(size: Int): FieldComparison[A] = FieldComparison(field, f"$$size", size)
+
+    // Projection
+    def $ : PositionalArrayFieldOps[A]            = new PositionalArrayFieldOps(BSONField(s"${field.fieldName}.$$"))
     def slice(n: Int): QueryProjection            = FieldArraySlice(field, n, None)
     def slice(n: Int, skip: Int): QueryProjection = FieldArraySlice(field, n, Some(skip))
   }
 
-  implicit def elemMatchProjection[Data[f[_]], M[_]](elemMatch: ElemMatch[Data, M]): QueryProjection =
+  implicit def elemMatchProjection[A](elemMatch: ElemMatch[A]): QueryProjection =
     FieldArrayElemMatch(elemMatch)
 
 }

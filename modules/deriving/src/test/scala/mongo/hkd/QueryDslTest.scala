@@ -14,11 +14,11 @@ class QueryDslTest extends CommonMongoSpec {
 
   val uuid1   = new UUID(0, 0)
   val nested1 = NestedData[Id](uuid1, Some("field"))
-  val data1   = Data[Id](1, "name1", Some("str"), true, List("tag1", "tag2"), nested1, List(nested1))
+  val data1   = Data[Id](1, "name1", Some("str"), true, List("tag1", "tag2"), nested1, Some(List(nested1)))
   val oid2    = BSONObjectID.generate()
   val uuid2   = new UUID(0, 1)
   val nested2 = NestedData[Id](uuid2, None)
-  val data2   = Data[Id](2, "name2", None, false, List("tag2", "tag3"), nested2, List(nested2))
+  val data2   = Data[Id](2, "name2", None, false, List("tag2", "tag3"), nested2, Some(List(nested2)))
 
   override def afterStart(): Unit = {
     Await.result(
@@ -137,7 +137,7 @@ class QueryDslTest extends CommonMongoSpec {
                      .cursor[Id]
                      .collect[List]()
         found6  <- collection
-                     .findQuery(_.nestedData m data1.nestedData)
+                     .findQuery(_.nestedData m nested1)
                      .requireOne[Id]
         found7  <- collection
                      .findQuery(_.nestedData ~ (_.id) $in (uuid1, uuid2))
@@ -148,7 +148,7 @@ class QueryDslTest extends CommonMongoSpec {
                      .cursor[Id]
                      .collect[List]()
         found9  <- collection
-                     .findQuery(fs => (fs.id $eq 1) $or (fs.nestedData m data2.nestedData))
+                     .findQuery(fs => (fs.id $eq 1) $or (fs.nestedData m nested2))
                      .cursor[Id]
                      .collect[List]()
         found10 <- collection.findQuery(_._id $in (oid1, oid2)).cursor[Id].collect[List]()
@@ -281,7 +281,7 @@ class QueryDslTest extends CommonMongoSpec {
                 Some(data2.isActive),
                 Some(List("tag3")),
                 Some(NestedData[Option](Some(nested2.id), None)),
-                Some(List(NestedData[Option](Some(nested2.id), None)))
+                Some(Some(List(NestedData[Option](Some(nested2.id), None))))
               )
             )
           )
@@ -297,7 +297,7 @@ class QueryDslTest extends CommonMongoSpec {
                 Some(data1.isActive),
                 Some(List("tag2")),
                 Some(NestedData[Option](Some(nested1.id), Some(nested1.secondField))),
-                Some(List(NestedData[Option](Some(nested1.id), Some(nested1.secondField))))
+                Some(Some(List(NestedData[Option](Some(nested1.id), Some(nested1.secondField)))))
               )
             ),
             BSONRecord(
@@ -309,7 +309,7 @@ class QueryDslTest extends CommonMongoSpec {
                 Some(data2.isActive),
                 Some(List("tag3")),
                 Some(NestedData[Option](Some(nested2.id), None)),
-                Some(List(NestedData[Option](Some(nested2.id), None)))
+                Some(Some(List(NestedData[Option](Some(nested2.id), None))))
               )
             )
           )

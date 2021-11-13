@@ -2,15 +2,15 @@ package mongo.hkd
 
 import reactivemongo.api.bson._
 
+import scala.annotation.nowarn
 import scala.collection.Factory
-import scala.reflect.{ClassTag, classTag}
 import scala.util.Try
 
 trait BSONField[A] {
   def fieldName: String
 }
 
-object BSONField extends HighPriorityImplicits {
+object BSONField extends NestedHKDCodes with SimpleFieldCodecs {
 
   type Fields[Data[f[_]]] = Data[BSONField]
 
@@ -23,69 +23,107 @@ object BSONField extends HighPriorityImplicits {
 
   def fields[Data[f[_]]](implicit inst: Fields[Data]): Fields[Data] = inst
 
-  implicit class ArrayFieldSyntax[Data[f[_]], M[_]](field: BSONField[M[Data[BSONField]]])(implicit
-      f: Factory[Data[BSONField], M[Data[BSONField]]]
+  implicit class BSONFieldSyntax[T, Data[f[_]]](field: BSONField[T])(implicit
+      w: DerivedFieldType.Nested[T, Data],
+      fields: BSONField.Fields[Data]
   ) {
-    def ~[A](accessor: Fields[Data] => BSONField[A])(implicit f: Fields[Data]): BSONField[A] =
-      Nested(field, accessor(f))
-  }
+    def nested[A](accessor: Fields[Data] => BSONField[A]): BSONField[A] =
+      Nested(field, accessor(fields))
 
-  implicit class BSONFieldSyntax[Data[f[_]]](val field: BSONField[Data[BSONField]]) extends AnyVal {
-    def nested[A](accessor: Fields[Data] => BSONField[A])(implicit f: Fields[Data]): BSONField[A] =
-      Nested(field, accessor(f))
-
-    @inline def ~[A](accessor: Fields[Data] => BSONField[A])(implicit f: Fields[Data]): BSONField[A] = nested(
-      accessor
-    )
+    @inline def ~[A](accessor: Fields[Data] => BSONField[A]): BSONField[A] = nested(accessor)
   }
 
 }
 
-trait HighPriorityImplicits extends LowPriorityImplicits {
+sealed trait DerivedFieldType[A, T, +E]
 
-  implicit class BSONFieldHKDCollectionCodecs[Data[f[_]], M[_]](field: BSONField[M[Data[BSONField]]])(implicit
-      f: Factory[Data[BSONField], M[Data[BSONField]]]
+@nowarn("msg=is never used")
+object DerivedFieldType extends DerivedFieldTypeLowPriorityImplicits {
+
+  sealed trait SimpleField
+  sealed trait OptionField
+  sealed trait ArrayField
+
+  type Field[A, T]           = DerivedFieldType[A, T, SimpleField]
+  type Array[A, T]           = DerivedFieldType[A, T, ArrayField with SimpleField]
+  type Option[A, T]          = DerivedFieldType[A, T, OptionField with SimpleField]
+  type Nested[A, Data[f[_]]] = DerivedFieldType[A, Data[BSONField], SimpleField]
+
+  def apply[A, T, E](): DerivedFieldType[A, T, E] = null
+  def field[A](): Field[A, A]                     = null
+  def array[A, T](): Array[A, T]                  = null
+  def option[A, T](): Option[A, T]                = null
+
+  implicit def wrappedOption[A, T, E](implicit
+      w: DerivedFieldType[A, T, E]
+  ): DerivedFieldType[scala.Option[A], T, OptionField with E] = null
+  implicit def wrappedArray[A, M[_], T, E](implicit
+      w: DerivedFieldType[A, T, E],
+      f: Factory[A, M[A]]
+  ): DerivedFieldType[M[A], T, ArrayField with E]             = null
+  implicit def wrappedNested[Data[f[_]]](implicit
+      fs: BSONField.Fields[Data]
+  ): DerivedFieldType.Nested[Data[BSONField], Data]           = null
+}
+
+@nowarn("msg=is never used")
+sealed trait DerivedFieldTypeLowPriorityImplicits {
+  implicit def wrappedProduct[A, Repr <: Product](implicit ev: Repr ¬ Option[A]): DerivedFieldType.Field[Repr, Repr] =
+    null
+  implicit def wrappedAnyVal[A <: AnyVal]: DerivedFieldType.Field[A, A]                                              = null
+  implicit def wrappedField[A: BSONWriter]: DerivedFieldType.Field[A, A]                                             = null
+}
+
+trait NestedHKDCodes {
+
+  implicit class BSONFieldHKDCodecs5[A, G[_], H[_], I[_], J[_], Data[f[_]]](
+      field: BSONField[G[H[I[J[Data[BSONField]]]]]]
   ) {
-    def read[F[_]](
-        bson: BSONDocument
-    )(implicit r: BSONReader[F[M[Data[F]]]], ct: ClassTag[F[M[Data[F]]]]): Try[F[M[Data[F]]]]              =
-      readOptional[F[M[Data[F]]]](field, bson)
+    type M[B] = G[H[I[J[B]]]]
+    def read[F[_]](bson: BSONDocument)(implicit r: BSONReader[F[M[Data[F]]]]): Try[F[M[Data[F]]]]          =
+      r.readTry(bson.get(field.fieldName).getOrElse(BSONNull))
     def write[F[_]](value: F[M[Data[F]]])(implicit w: BSONWriter[F[M[Data[F]]]]): Try[(String, BSONValue)] =
       w.writeTry(value).map(field.fieldName -> _)
   }
 
-  implicit class BSONFieldHKDCodecs[Data[f[_]]](field: BSONField[Data[BSONField]]) {
-    def read[F[_]](bson: BSONDocument)(implicit r: BSONReader[F[Data[F]]], ct: ClassTag[F[Data[F]]]): Try[F[Data[F]]] =
-      readOptional[F[Data[F]]](field, bson)
-    def write[F[_]](value: F[Data[F]])(implicit w: BSONWriter[F[Data[F]]]): Try[(String, BSONValue)]                  =
+  implicit class BSONFieldHKDCodecs4[G[_], H[_], I[_], Data[f[_]]](field: BSONField[G[H[I[Data[BSONField]]]]]) {
+    type M[B] = G[H[I[B]]]
+    def read[F[_]](bson: BSONDocument)(implicit r: BSONReader[F[M[Data[F]]]]): Try[F[M[Data[F]]]]          =
+      r.readTry(bson.get(field.fieldName).getOrElse(BSONNull))
+    def write[F[_]](value: F[M[Data[F]]])(implicit w: BSONWriter[F[M[Data[F]]]]): Try[(String, BSONValue)] =
       w.writeTry(value).map(field.fieldName -> _)
   }
 
-  implicit class BSONFieldOptionCodecs[A](field: BSONField[Option[A]]) {
-    def read[F[_]](bson: BSONDocument)(implicit r: BSONReader[F[Option[A]]]): Try[F[Option[A]]] =
+  implicit class BSONFieldHKDCodecs3[G[_], H[_], Data[f[_]]](field: BSONField[G[H[Data[BSONField]]]]) {
+    type M[A] = G[H[A]]
+    def read[F[_]](bson: BSONDocument)(implicit r: BSONReader[F[M[Data[F]]]]): Try[F[M[Data[F]]]]          =
       r.readTry(bson.get(field.fieldName).getOrElse(BSONNull))
+    def write[F[_]](value: F[M[Data[F]]])(implicit w: BSONWriter[F[M[Data[F]]]]): Try[(String, BSONValue)] =
+      w.writeTry(value).map(field.fieldName -> _)
+  }
+
+  implicit class BSONFieldHKDCodecs2[G[_], Data[f[_]]](field: BSONField[G[Data[BSONField]]]) {
+    def read[F[_]](bson: BSONDocument)(implicit r: BSONReader[F[G[Data[F]]]]): Try[F[G[Data[F]]]]          =
+      r.readTry(bson.get(field.fieldName).getOrElse(BSONNull))
+    def write[F[_]](value: F[G[Data[F]]])(implicit w: BSONWriter[F[G[Data[F]]]]): Try[(String, BSONValue)] =
+      w.writeTry(value).map(field.fieldName -> _)
+  }
+
+  implicit class BSONFieldHKDCodecs1[Data[f[_]]](field: BSONField[Data[BSONField]]) {
+    def read[F[_]](bson: BSONDocument)(implicit r: BSONReader[F[Data[F]]]): Try[F[Data[F]]]          =
+      r.readTry(bson.get(field.fieldName).getOrElse(BSONNull))
+    def write[F[_]](value: F[Data[F]])(implicit w: BSONWriter[F[Data[F]]]): Try[(String, BSONValue)] =
+      w.writeTry(value).map(field.fieldName -> _)
   }
 
 }
 
-trait LowPriorityImplicits {
-
-  protected def readOptional[A](field: BSONField[_], bson: BSONDocument)(implicit
-      r: BSONReader[A],
-      ct: ClassTag[A]
-  ): Try[A] = {
-    // TODO Make without reflection
-    if (ct.runtimeClass.isAssignableFrom(classTag[Option[A]].runtimeClass)) {
-      r.readTry(bson.get(field.fieldName).getOrElse(BSONNull))
-    } else {
-      bson.getAsTry[A](field.fieldName)
-    }
-  }
+trait SimpleFieldCodecs {
 
   implicit class BSONFieldCodecs[A](field: BSONField[A]) {
-    def read[F[_]](bson: BSONDocument)(implicit r: BSONReader[F[A]], ct: ClassTag[F[A]]): Try[F[A]] =
-      readOptional[F[A]](field, bson)
-    def write[F[_]](value: F[A])(implicit w: BSONWriter[F[A]]): Try[(String, BSONValue)]            =
+    def read[F[_]](bson: BSONDocument)(implicit r: BSONReader[F[A]]): Try[F[A]]          =
+      r.readTry(bson.get(field.fieldName).getOrElse(BSONNull))
+    def write[F[_]](value: F[A])(implicit w: BSONWriter[F[A]]): Try[(String, BSONValue)] =
       w.writeTry(value).map(field.fieldName -> _)
   }
 

@@ -23,7 +23,7 @@ class BSONFieldTest extends AnyFreeSpec with Matchers {
     "codecs" in {
       val nested    = NestedData[Id](UUID.randomUUID(), None)
       val data      =
-        Data[Id](1, "name", Some("description"), true, List("tag1", "tag2"), nested, List(nested))
+        Data[Id](1, "name", Some("description"), true, List("tag1", "tag2"), nested, Some(List(nested)))
       val optNested = NestedData[Option](Some(nested.id), None)
       val optData   = Data[Option](
         Some(data.id),
@@ -32,7 +32,7 @@ class BSONFieldTest extends AnyFreeSpec with Matchers {
         Some(data.isActive),
         Some(data.tags),
         Some(optNested),
-        Some(List(optNested))
+        Some(Some(List(optNested)))
       )
 
       val bson = BSON.write(data).get
@@ -67,7 +67,7 @@ class BSONFieldTest extends AnyFreeSpec with Matchers {
       val oid       = BSONObjectID.generate()
       val nested    = NestedData[Id](UUID.randomUUID(), None)
       val data      =
-        Data[Id](1, "name", Some("description"), true, List("tag1", "tag2"), nested, List(nested)).record(oid)
+        Data[Id](1, "name", Some("description"), true, List("tag1", "tag2"), nested, None).record(oid)
       val optNested = NestedData[Option](Some(data.data.nestedData.id), None)
       val optData   = Data[Option](
         Some(data.data.id),
@@ -76,7 +76,7 @@ class BSONFieldTest extends AnyFreeSpec with Matchers {
         Some(data.data.isActive),
         Some(data.data.tags),
         Some(optNested),
-        Some(List(optNested))
+        None
       ).record(Some(oid))
 
       val bson = BSON.write(data).get
@@ -94,12 +94,7 @@ class BSONFieldTest extends AnyFreeSpec with Matchers {
                                 |    'id': '${nested.id}',
                                 |    'second_field': null
                                 |  },
-                                |  'other_data': [
-                                |    {
-                                |      'id': '${nested.id}',
-                                |      'second_field': null
-                                |    }
-                                |  ]
+                                |  'other_data': null
                                 |}""".stripMargin)
       BSON.read[Data[Id]](bson).get should be(data.data)
       BSON.read[BSONRecord[Data, Id]](bson).get should be(data)

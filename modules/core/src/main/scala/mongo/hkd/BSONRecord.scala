@@ -2,8 +2,6 @@ package mongo.hkd
 
 import reactivemongo.api.bson._
 
-import scala.reflect.ClassTag
-
 sealed trait Record
 
 object Record {
@@ -23,15 +21,14 @@ final case class BSONRecord[Data[f[_]], F[_]](_id: F[BSONObjectID], data: Data[F
 
 object BSONRecord {
   implicit def reader[Data[f[_]], F[_]](implicit
-      ct: ClassTag[F[BSONObjectID]],
       readId: BSONReader[F[BSONObjectID]],
       readData: BSONDocumentReader[Data[F]]
-  ): BSONDocumentReader[BSONRecord[Data, F]] = BSONDocumentReader.from(bson =>
+  ): BSONDocumentReader[BSONRecord[Data, F]] = BSONDocumentReader.from { bson =>
     for {
       _id  <- Record.idField.read[F](bson)
       data <- readData.readTry(bson)
     } yield BSONRecord(_id, data)
-  )
+  }
   implicit def writer[Data[f[_]], F[_]](implicit
       writeId: BSONWriter[F[BSONObjectID]],
       writeData: BSONDocumentWriter[Data[F]]
