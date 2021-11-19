@@ -2,15 +2,13 @@ package mongo.hkd
 
 import reactivemongo.api.bson._
 
-import scala.annotation.nowarn
-import scala.collection.Factory
 import scala.util.Try
 
 trait BSONField[A] {
   def fieldName: String
 }
 
-object BSONField extends NestedHKDCodes with SimpleFieldCodecs {
+object BSONField extends NestedHKDCodes with DefaultCodecs {
 
   type Fields[Data[f[_]]] = Data[BSONField]
 
@@ -33,45 +31,6 @@ object BSONField extends NestedHKDCodes with SimpleFieldCodecs {
     @inline def ~[A](accessor: Fields[Data] => BSONField[A]): BSONField[A] = nested(accessor)
   }
 
-}
-
-sealed trait DerivedFieldType[A, T, +E]
-
-@nowarn("msg=is never used")
-object DerivedFieldType extends DerivedFieldTypeLowPriorityImplicits {
-
-  sealed trait SimpleField
-  sealed trait OptionField
-  sealed trait ArrayField
-
-  type Field[A, T]           = DerivedFieldType[A, T, SimpleField]
-  type Array[A, T]           = DerivedFieldType[A, T, ArrayField with SimpleField]
-  type Option[A, T]          = DerivedFieldType[A, T, OptionField with SimpleField]
-  type Nested[A, Data[f[_]]] = DerivedFieldType[A, Data[BSONField], SimpleField]
-
-  def apply[A, T, E](): DerivedFieldType[A, T, E] = null
-  def field[A](): Field[A, A]                     = null
-  def array[A, T](): Array[A, T]                  = null
-  def option[A, T](): Option[A, T]                = null
-
-  implicit def wrappedOption[A, T, E](implicit
-      w: DerivedFieldType[A, T, E]
-  ): DerivedFieldType[scala.Option[A], T, OptionField with E] = null
-  implicit def wrappedArray[A, M[_], T, E](implicit
-      w: DerivedFieldType[A, T, E],
-      f: Factory[A, M[A]]
-  ): DerivedFieldType[M[A], T, ArrayField with E]             = null
-  implicit def wrappedNested[Data[f[_]]](implicit
-      fs: BSONField.Fields[Data]
-  ): DerivedFieldType.Nested[Data[BSONField], Data]           = null
-}
-
-@nowarn("msg=is never used")
-sealed trait DerivedFieldTypeLowPriorityImplicits {
-  implicit def wrappedProduct[A, Repr <: Product](implicit ev: Repr ¬ Option[A]): DerivedFieldType.Field[Repr, Repr] =
-    null
-  implicit def wrappedAnyVal[A <: AnyVal]: DerivedFieldType.Field[A, A]                                              = null
-  implicit def wrappedField[A: BSONWriter]: DerivedFieldType.Field[A, A]                                             = null
 }
 
 trait NestedHKDCodes {
@@ -118,7 +77,7 @@ trait NestedHKDCodes {
 
 }
 
-trait SimpleFieldCodecs {
+trait DefaultCodecs {
 
   implicit class BSONFieldCodecs[A](field: BSONField[A]) {
     def read[F[_]](bson: BSONDocument)(implicit r: BSONReader[F[A]]): Try[F[A]]          =

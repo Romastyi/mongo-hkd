@@ -8,61 +8,6 @@ import reactivemongo.api.bson.collection.BSONCollection
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
-sealed trait BSONValueWrapper {
-  def bson: BSONValue
-}
-
-object BSONValueWrapper {
-  implicit def wrapper[A](value: A)(implicit w: BSONWriter[A]): BSONValueWrapper = new BSONValueWrapper {
-    override def bson: BSONValue = w.writeTry(value).get
-  }
-}
-
-sealed trait Query {
-  def bson: BSONDocument
-}
-
-object Query {
-  implicit def `BSONWriter[Query]`[Q <: Query]: BSONDocumentWriter[Q] = BSONDocumentWriter(_.bson)
-}
-
-final case class LogicalOperator[A <: Query, B <: Query](left: A, right: B, operator: String) extends Query {
-  override def bson: BSONDocument = document(operator -> array(left.bson, right.bson))
-}
-
-final case class FieldMatchExpr[A](field: BSONField[A], wrapper: BSONValueWrapper) extends Query {
-  def elem: ElementProducer       = field.fieldName -> wrapper.bson
-  override def bson: BSONDocument = document(elem)
-}
-
-sealed trait QueryExpr[A] extends Query {
-  def field: BSONField[A]
-  def expr: BSONDocument
-  final override def bson: BSONDocument = document(field.fieldName -> expr)
-}
-
-final case class FieldComparison[A](override val field: BSONField[A], operator: String, wrapper: BSONValueWrapper)
-    extends QueryExpr[A] {
-  override def expr: BSONDocument = document(operator -> wrapper.bson)
-}
-
-final case class ElemMatch[A](override val field: BSONField[A], query: Query) extends QueryExpr[A] {
-  override def expr: BSONDocument = document("$elemMatch" -> query.bson)
-}
-
-final case class FieldComparisonOperators[A, V](field: BSONField[A])(implicit w: BSONWriter[V]) {
-  def $eq(value: V): FieldComparison[A]                                  = FieldComparison(field, "$eq", value)
-  def $ne(value: V): FieldComparison[A]                                  = FieldComparison(field, "$ne", value)
-  def $gt(value: V): FieldComparison[A]                                  = FieldComparison(field, "$gt", value)
-  def $gte(value: V): FieldComparison[A]                                 = FieldComparison(field, "$gte", value)
-  def $lt(value: V): FieldComparison[A]                                  = FieldComparison(field, "$lt", value)
-  def $lte(value: V): FieldComparison[A]                                 = FieldComparison(field, "$lte", value)
-  def $in(value: V, others: V*): FieldComparison[A]                      = FieldComparison(field, "$in", value +: others)
-  def $nin(value: V, others: V*): FieldComparison[A]                     = FieldComparison(field, "$nin", value +: others)
-  def $not(expr: BSONField[A] => FieldComparison[A]): FieldComparison[A] =
-    FieldComparison(field, "$not", expr(field).expr)
-}
-
 final case class QueryOperations[Data[f[_]]](
     private val builder: BSONCollection#QueryBuilder,
     private val fields: Record.RecordFields[Data]
@@ -111,6 +56,51 @@ final case class QueryOperations[Data[f[_]]](
       reader: BSONDocumentReader[BSONRecord[Data, F]]
   ): WithOps[BSONRecord[Data, F]] =
     builder.cursor[BSONRecord[Data, F]](readPreference)
+}
+
+sealed trait Query {
+  def bson: BSONDocument
+}
+
+object Query {
+  implicit def `BSONWriter[Query]`[Q <: Query]: BSONDocumentWriter[Q] = BSONDocumentWriter(_.bson)
+}
+
+final case class LogicalOperator[A <: Query, B <: Query](left: A, right: B, operator: String) extends Query {
+  override def bson: BSONDocument = document(operator -> array(left.bson, right.bson))
+}
+
+final case class FieldMatchExpr[A](field: BSONField[A], value: BSONValueWrapper) extends Query {
+  def elem: ElementProducer       = field.fieldName -> value.bson
+  override def bson: BSONDocument = document(elem)
+}
+
+sealed trait QueryExpr[A] extends Query {
+  def field: BSONField[A]
+  def expr: BSONDocument
+  final override def bson: BSONDocument = document(field.fieldName -> expr)
+}
+
+final case class FieldComparison[A](override val field: BSONField[A], operator: String, value: BSONValueWrapper)
+    extends QueryExpr[A] {
+  override def expr: BSONDocument = document(operator -> value.bson)
+}
+
+final case class ElemMatch[A](override val field: BSONField[A], query: Query) extends QueryExpr[A] {
+  override def expr: BSONDocument = document("$elemMatch" -> query.bson)
+}
+
+final case class FieldComparisonOperators[A, V](field: BSONField[A])(implicit w: BSONWriter[V]) {
+  def $eq(value: V): FieldComparison[A]                                  = FieldComparison(field, "$eq", value)
+  def $ne(value: V): FieldComparison[A]                                  = FieldComparison(field, "$ne", value)
+  def $gt(value: V): FieldComparison[A]                                  = FieldComparison(field, "$gt", value)
+  def $gte(value: V): FieldComparison[A]                                 = FieldComparison(field, "$gte", value)
+  def $lt(value: V): FieldComparison[A]                                  = FieldComparison(field, "$lt", value)
+  def $lte(value: V): FieldComparison[A]                                 = FieldComparison(field, "$lte", value)
+  def $in(value: V, others: V*): FieldComparison[A]                      = FieldComparison(field, "$in", value +: others)
+  def $nin(value: V, others: V*): FieldComparison[A]                     = FieldComparison(field, "$nin", value +: others)
+  def $not(expr: BSONField[A] => FieldComparison[A]): FieldComparison[A] =
+    FieldComparison(field, "$not", expr(field).expr)
 }
 
 sealed trait QueryProjection
@@ -223,10 +213,10 @@ trait QueryDslLowPriorityImplicits {
 
   implicit class ArrayFieldsOperators[A, T](field: BSONField[A])(implicit f: DerivedFieldType.Array[A, T]) {
     // Query
-    def $all(value: T, others: T*)(implicit
-        w: BSONWriter[T]
-    ): FieldComparison[A]                    = FieldComparison(field, "$all", value +: others)
-    def $size(size: Int): FieldComparison[A] = FieldComparison(field, f"$$size", size)
+    def $all(value: T, others: T*)(implicit w: BSONWriter[T]): FieldComparison[A] =
+      FieldComparison(field, "$all", value +: others)
+    def $size(size: Int): FieldComparison[A]                                      =
+      FieldComparison(field, f"$$size", size)
 
     // Projection
     def $ : PositionalArrayFieldOps[A]            = new PositionalArrayFieldOps(BSONField(s"${field.fieldName}.$$"))
