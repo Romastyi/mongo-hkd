@@ -1,5 +1,6 @@
 package mongo
 
 package object hkd {
-  type Id[A] = A
+  type Ident[A] = A
+  def ident[A](a: A): Ident[A] = a
 }

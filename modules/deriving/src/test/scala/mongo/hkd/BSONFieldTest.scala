@@ -21,10 +21,10 @@ class BSONFieldTest extends AnyFreeSpec with Matchers {
       (BSONField.fields[Data].otherData ~ (_.secondField)).fieldName should be("other_data.second_field")
     }
     "codecs" in {
-      val nested    = NestedData[Id](UUID.randomUUID(), None)
+      val nested    = NestedData[Ident](UUID.randomUUID(), Some(1), None)
       val data      =
-        Data[Id](1, "name", Some("description"), true, List("tag1", "tag2"), nested, Some(List(nested)))
-      val optNested = NestedData[Option](Some(nested.id), None)
+        Data[Ident](1, "name", Some("description"), true, List("tag1", "tag2"), nested, Some(List(nested)))
+      val optNested = NestedData[Option](Some(nested.id), Some(nested.firstField), None)
       val optData   = Data[Option](
         Some(data.id),
         Some(data.name),
@@ -47,16 +47,18 @@ class BSONFieldTest extends AnyFreeSpec with Matchers {
                                |  ],
                                |  'nested_data': {
                                |    'id': '${nested.id}',
+                               |    'first_field': NumberLong(1),
                                |    'second_field': null
                                |  },
                                |  'other_data': [
                                |    {
                                |      'id': '${nested.id}',
+                               |      'first_field': NumberLong(1),
                                |      'second_field': null
                                |    }
                                |  ]
                                |}""".stripMargin)
-      BSON.read[Data[Id]](bson).get should be(data)
+      BSON.read[Data[Ident]](bson).get should be(data)
       BSON.read[Data[Option]](bson).get should be(optData)
       pretty(BSON.write(optData).get) should be(pretty(bson))
     }
@@ -65,10 +67,10 @@ class BSONFieldTest extends AnyFreeSpec with Matchers {
   "BSONRecord" - {
     "codecs" in {
       val oid       = BSONObjectID.generate()
-      val nested    = NestedData[Id](UUID.randomUUID(), None)
+      val nested    = NestedData[Ident](UUID.randomUUID(), Some(1), None)
       val data      =
-        Data[Id](1, "name", Some("description"), true, List("tag1", "tag2"), nested, None).record(oid)
-      val optNested = NestedData[Option](Some(data.data.nestedData.id), None)
+        Data[Ident](1, "name", Some("description"), true, List("tag1", "tag2"), nested, None).record(oid)
+      val optNested = NestedData[Option](Some(nested.id), Some(nested.firstField), None)
       val optData   = Data[Option](
         Some(data.data.id),
         Some(data.data.name),
@@ -92,12 +94,13 @@ class BSONFieldTest extends AnyFreeSpec with Matchers {
                                 |  ],
                                 |  'nested_data': {
                                 |    'id': '${nested.id}',
+                                |    'first_field': NumberLong(1),
                                 |    'second_field': null
                                 |  },
                                 |  'other_data': null
                                 |}""".stripMargin)
-      BSON.read[Data[Id]](bson).get should be(data.data)
-      BSON.read[BSONRecord[Data, Id]](bson).get should be(data)
+      BSON.read[Data[Ident]](bson).get should be(data.data)
+      BSON.read[BSONRecord[Data, Ident]](bson).get should be(data)
       BSON.read[Data[Option]](bson).get should be(optData.data)
       BSON.read[BSONRecord[Data, Option]](bson).get should be(optData)
       pretty(BSON.write(optData).get) should be(pretty(bson))

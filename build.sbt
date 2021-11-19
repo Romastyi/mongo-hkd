@@ -20,13 +20,14 @@ lazy val deriving = (project in file("modules") / "deriving")
     scalacOptions += "-Ymacro-annotations",
     scalafmtOnCompile := true,
     libraryDependencies ++= Seq(
-      scalaOrganization.value    % "scala-compiler"                 % scalaVersion.value % Provided,
-      scalaOrganization.value    % "scala-reflect"                  % scalaVersion.value % Provided,
-      "org.scalatest"           %% "scalatest"                      % "3.2.9"            % Test,
-      "com.dimafeng"            %% "testcontainers-scala-scalatest" % "0.39.12"          % Test,
-      "com.dimafeng"            %% "testcontainers-scala-mongodb"   % "0.39.12"          % Test,
-      "org.apache.logging.log4j" % "log4j-core"                     % "2.14.1"           % Test,
-      "org.slf4j"                % "slf4j-simple"                   % "1.7.32"           % Test
+      scalaOrganization.value       % "scala-compiler"                 % scalaVersion.value % Provided,
+      scalaOrganization.value       % "scala-reflect"                  % scalaVersion.value % Provided,
+      "org.scalatest"              %% "scalatest"                      % "3.2.9"            % Test,
+      "com.dimafeng"               %% "testcontainers-scala-scalatest" % "0.39.12"          % Test,
+      "com.dimafeng"               %% "testcontainers-scala-mongodb"   % "0.39.12"          % Test,
+      "org.apache.logging.log4j"    % "log4j-core"                     % "2.14.1"           % Test,
+      "org.slf4j"                   % "slf4j-simple"                   % "1.7.32"           % Test,
+      "com.softwaremill.quicklens" %% "quicklens"                      % "1.7.5"            % Test
     )
   )
   .dependsOn(core)

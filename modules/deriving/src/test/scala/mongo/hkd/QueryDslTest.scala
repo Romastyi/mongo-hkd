@@ -13,12 +13,12 @@ import scala.language.postfixOps
 class QueryDslTest extends CommonMongoSpec {
 
   val uuid1   = new UUID(0, 0)
-  val nested1 = NestedData[Id](uuid1, Some("field"))
-  val data1   = Data[Id](1, "name1", Some("str"), true, List("tag1", "tag2"), nested1, Some(List(nested1)))
+  val nested1 = NestedData[Ident](uuid1, Some(1), Some("field"))
+  val data1   = Data[Ident](1, "name1", Some("str"), true, List("tag1", "tag2"), nested1, Some(List(nested1)))
   val oid2    = BSONObjectID.generate()
   val uuid2   = new UUID(0, 1)
-  val nested2 = NestedData[Id](uuid2, None)
-  val data2   = Data[Id](2, "name2", None, false, List("tag2", "tag3"), nested2, Some(List(nested2)))
+  val nested2 = NestedData[Ident](uuid2, Some(2), None)
+  val data2   = Data[Ident](2, "name2", None, false, List("tag2", "tag3"), nested2, Some(List(nested2)))
 
   override def afterStart(): Unit = {
     Await.result(
@@ -47,13 +47,14 @@ class QueryDslTest extends CommonMongoSpec {
           |}""".stripMargin)
       val query2: Query = (fields.name m "name") ::
         (fields.isActive m true) ::
-        (fields.nestedData m NestedData[Id](id = uuid1, secondField = Some("one"))) ::
+        (fields.nestedData m NestedData[Ident](id = uuid1, firstField = Some(1), secondField = Some("one"))) ::
         Nil
       pretty(query2.bson) should be("""{
           |  'name': 'name',
           |  'is_active': true,
           |  'nested_data': {
           |    'id': '00000000-0000-0000-0000-000000000000',
+          |    'first_field': NumberLong(1),
           |    'second_field': 'one'
           |  }
           |}""".stripMargin)
@@ -117,47 +118,48 @@ class QueryDslTest extends CommonMongoSpec {
       for {
         found0  <- collection.findAll
                      .sort(_.id.desc)
-                     .cursor[Id]
+                     .cursor[Ident]
                      .collect[List]()
         found1  <- collection
                      .findQuery(_.id $eq 1)
-                     .one[Id]
+                     .one[Ident]
         found2  <- collection
                      .findQuery(_.id $eq 2)
-                     .one[Id]
+                     .one[Ident]
         found3  <- collection
                      .findQuery(_.id $eq 3)
-                     .one[Id]
+                     .one[Ident]
         found4  <- collection
                      .findQuery(_.name $regex """(name)\d?""")
-                     .cursor[Id]
+                     .cursor[Ident]
                      .collect[List]()
         found5  <- collection
                      .findQuery(fs => (fs.name $regex """(name)\d?""") $and (fs.description $eq None))
-                     .cursor[Id]
+                     .cursor[Ident]
                      .collect[List]()
         found6  <- collection
                      .findQuery(_.nestedData m nested1)
-                     .requireOne[Id]
+                     .requireOne[Ident]
         found7  <- collection
                      .findQuery(_.nestedData ~ (_.id) $in (uuid1, uuid2))
-                     .cursor[Id]
+                     .cursor[Ident]
                      .collect[List]()
         found8  <- collection
                      .findQuery(_.nestedData ~ (_.id) $not (_ $eq uuid1))
-                     .cursor[Id]
+                     .cursor[Ident]
                      .collect[List]()
         found9  <- collection
                      .findQuery(fs => (fs.id $eq 1) $or (fs.nestedData m nested2))
-                     .cursor[Id]
+                     .cursor[Ident]
                      .collect[List]()
-        found10 <- collection.findQuery(_._id $in (oid1, oid2)).cursor[Id].collect[List]()
+        found10 <- collection.findQuery(_._id $in (oid1, oid2)).cursor[Ident].collect[List]()
         found11 <- collection
                      .findQuery(_.otherData $all (_ $elemMatch (_.id $eq uuid2)))
-                     .cursor[Id]
+                     .cursor[Ident]
                      .collect[List]()
-        found12 <- collection.findQuery(_.tags $all ("tag1", "tag2")).cursor[Id].collect[List]()
-        found13 <- collection.findQuery(fs => (fs.tags $size 2) $or (fs.otherData $size 2)).cursor[Id].collect[List]()
+        found12 <- collection.findQuery(_.tags $all ("tag1", "tag2")).cursor[Ident].collect[List]()
+        found13 <-
+          collection.findQuery(fs => (fs.tags $size 2) $or (fs.otherData $size 2)).cursor[Ident].collect[List]()
       } yield {
         found0.map(_.data) should be(data2 :: data1 :: Nil)
         found1.map(_._id) should not be Some(oid1)
@@ -232,11 +234,15 @@ class QueryDslTest extends CommonMongoSpec {
           List(
             BSONRecord[Data, Option](
               None,
-              emptyData.copy(id = Some(1), nestedData = Some(NestedData[Option](Some(uuid1), Some(Some("field")))))
+              emptyData
+                .copy(
+                  id = Some(1),
+                  nestedData = Some(NestedData[Option](Some(uuid1), Some(Some(1)), Some(Some("field"))))
+                )
             ),
             BSONRecord[Data, Option](
               None,
-              emptyData.copy(id = Some(2), nestedData = Some(NestedData[Option](Some(uuid2), None)))
+              emptyData.copy(id = Some(2), nestedData = Some(NestedData[Option](Some(uuid2), Some(Some(2)), None)))
             )
           )
         )
@@ -244,11 +250,11 @@ class QueryDslTest extends CommonMongoSpec {
           List(
             BSONRecord(
               Some(oid1),
-              emptyData.copy(id = Some(1), nestedData = Some(NestedData[Option](Some(uuid1), None)))
+              emptyData.copy(id = Some(1), nestedData = Some(NestedData[Option](Some(uuid1), None, None)))
             ),
             BSONRecord(
               Some(oid2),
-              emptyData.copy(id = Some(2), nestedData = Some(NestedData[Option](Some(uuid2), None)))
+              emptyData.copy(id = Some(2), nestedData = Some(NestedData[Option](Some(uuid2), None, None)))
             )
           )
         )
@@ -268,7 +274,7 @@ class QueryDslTest extends CommonMongoSpec {
                 Some(data1.description),
                 Some(data1.isActive),
                 Some(List("tag2")),
-                Some(NestedData[Option](Some(nested1.id), Some(nested1.secondField))),
+                Some(NestedData[Option](Some(nested1.id), Some(nested1.firstField), Some(nested1.secondField))),
                 None
               )
             ),
@@ -280,8 +286,8 @@ class QueryDslTest extends CommonMongoSpec {
                 None,
                 Some(data2.isActive),
                 Some(List("tag3")),
-                Some(NestedData[Option](Some(nested2.id), None)),
-                Some(Some(List(NestedData[Option](Some(nested2.id), None))))
+                Some(NestedData[Option](Some(nested2.id), Some(nested2.firstField), None)),
+                Some(Some(List(NestedData[Option](Some(nested2.id), Some(nested2.firstField), None))))
               )
             )
           )
@@ -296,8 +302,10 @@ class QueryDslTest extends CommonMongoSpec {
                 Some(data1.description),
                 Some(data1.isActive),
                 Some(List("tag2")),
-                Some(NestedData[Option](Some(nested1.id), Some(nested1.secondField))),
-                Some(Some(List(NestedData[Option](Some(nested1.id), Some(nested1.secondField)))))
+                Some(NestedData[Option](Some(nested1.id), Some(nested1.firstField), Some(nested1.secondField))),
+                Some(
+                  Some(List(NestedData[Option](Some(nested1.id), Some(nested1.firstField), Some(nested1.secondField))))
+                )
               )
             ),
             BSONRecord(
@@ -308,8 +316,8 @@ class QueryDslTest extends CommonMongoSpec {
                 None,
                 Some(data2.isActive),
                 Some(List("tag3")),
-                Some(NestedData[Option](Some(nested2.id), None)),
-                Some(Some(List(NestedData[Option](Some(nested2.id), None))))
+                Some(NestedData[Option](Some(nested2.id), Some(nested2.firstField), None)),
+                Some(Some(List(NestedData[Option](Some(nested2.id), Some(nested2.firstField), None))))
               )
             )
           )
