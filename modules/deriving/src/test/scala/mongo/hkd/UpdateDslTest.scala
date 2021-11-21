@@ -34,11 +34,12 @@ class UpdateDslTest extends CommonMongoSpec {
         _       <- collection.insert[Ident].one(item)
         found   <- collection.findQuery(_.id $eq item.data.id).requireOne[Ident]
         _       <- collection.update.one(
-                     _._id $eq item._id,
-                     _.id $inc 2,
-                     _.name $set "name~",
-                     _.description.$unset,
-                     fs => (fs.nestedData ~ (_.firstField)) $mul 2
+                     _.op(_._id $eq item._id)(
+                       _.id $inc 2,
+                       _.name $set "name~",
+                       _.description.$unset,
+                       fs => (fs.nestedData ~ (_.firstField)) $mul 2
+                     )
                    )
         updated <- collection.findQuery(_._id $eq item._id).requireOne[Ident]
       } yield {
@@ -52,6 +53,25 @@ class UpdateDslTest extends CommonMongoSpec {
           .setTo(None)
           .modify(_.data.nestedData)
           .using(_.modify(_.firstField).using(_.map(_ * 2)))
+      }
+    }
+    "bulk update" in withCollection[Data].apply { collection =>
+      val item1 = record()
+      val item2 = record()
+      for {
+        _       <- collection.insert[Ident].many(item1, item2)
+        found   <- collection.findQuery(_._id $in (item1._id, item2._id)).cursor[Ident].collect[List]()
+        _       <- collection.update.bulk(
+                     _.op(_._id $eq item1._id)(_.id $inc 1, _.name $set "name~1"),
+                     _.op(_._id $eq item2._id)(_.id $inc 2, _.name $set "name~2")
+                   )
+        updated <- collection.findQuery(_._id $in (item1._id, item2._id)).cursor[Ident].collect[List]()
+      } yield {
+        found shouldBe List(item1, item2)
+        updated shouldBe List(
+          item1.modify(_.data.id).using(_ + 1).modify(_.data.name).setTo("name~1"),
+          item2.modify(_.data.id).using(_ + 2).modify(_.data.name).setTo("name~2")
+        )
       }
     }
   }

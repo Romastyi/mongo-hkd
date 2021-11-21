@@ -1,29 +1,108 @@
 package mongo.hkd
 
-import reactivemongo.api.WriteConcern
+import mongo.hkd.Record.RecordFields
 import reactivemongo.api.bson._
 import reactivemongo.api.bson.collection.BSONCollection
+import reactivemongo.api.{Collation, WriteConcern}
+import reactivemongo.api.ext._
 
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
-final case class UpdateOperations[Data[f[_]]](
-    private val builder: BSONCollection#UpdateBuilder,
-    private val fields: Record.RecordFields[Data]
-) {
-  def one(
-      query: Record.RecordFields[Data] => Query,
+sealed trait UpdateOpBuilder[Data[f[_]]] {
+  def op(query: Record.RecordFields[Data] => Query)(
       op: Record.RecordFields[Data] => FieldUpdateOperator,
       ops: (Record.RecordFields[Data] => FieldUpdateOperator)*
-  )(implicit ec: ExecutionContext): Future[BSONCollection#UpdateWriteResult] =
-    builder.one(query(fields), UpdateOperators((op +: ops).map(_.apply(fields))))
+  ): UpdateOp
+}
 
-  def many(
-      query: Record.RecordFields[Data] => Query,
-      op: Record.RecordFields[Data] => FieldUpdateOperator,
-      ops: (Record.RecordFields[Data] => FieldUpdateOperator)*
-  )(implicit ec: ExecutionContext): Future[BSONCollection#UpdateWriteResult] =
-    builder.one(query(fields), UpdateOperators((op +: ops).map(_.apply(fields))), multi = true)
+final class UpdateOperations[Data[f[_]]](
+    private val coll: BSONCollection,
+    private val fields: Record.RecordFields[Data]
+)(
+    val ordered: Boolean = false,
+    val writeConcern: WriteConcern = coll.db.connection.opts.writeConcern,
+    val bypassDocumentValidation: Boolean = false,
+) extends UpdateOpBuilder[Data] {
+
+  override def op(query: RecordFields[Data] => Query)(
+      op: RecordFields[Data] => FieldUpdateOperator,
+      ops: (RecordFields[Data] => FieldUpdateOperator)*
+  ): UpdateOp =
+    UpdateOp(query(fields), UpdateOperators((op +: ops).map(_.apply(fields))))
+
+  private def builder = coll.update(ordered, writeConcern, bypassDocumentValidation)
+
+  private def element(op: UpdateOp) = builder.element(
+    q = op.query.bson,
+    u = op.ops.bson,
+    upsert = op.upsert,
+    multi = op.multi,
+    collation = op.collation,
+    arrayFilters = op.arrayFilters
+  )
+
+  private def execute(op: UpdateOp)(implicit ec: ExecutionContext): Future[BSONCollection#UpdateWriteResult] =
+    builder.one(
+      q = op.query,
+      u = op.ops,
+      upsert = op.upsert,
+      multi = op.multi,
+      collation = op.collation,
+      arrayFilters = op.arrayFilters
+    )
+
+  def one(update: UpdateOpBuilder[Data] => UpdateOp)(implicit
+      ec: ExecutionContext
+  ): Future[BSONCollection#UpdateWriteResult] = execute(update(this).multi(false))
+
+  def many(update: UpdateOpBuilder[Data] => UpdateOp)(implicit
+      ec: ExecutionContext
+  ): Future[BSONCollection#UpdateWriteResult] =
+    execute(update(this).multi(true))
+
+  def bulk(
+      update: UpdateOpBuilder[Data] => UpdateOp,
+      updates: (UpdateOpBuilder[Data] => UpdateOp)*
+  )(implicit ec: ExecutionContext): Future[BSONCollection#MultiBulkWriteResult] =
+    Future
+      .sequence((update +: updates).map(op => element(op(this))))
+      .flatMap(builder.many)
+}
+
+sealed trait UpdateOp {
+  def query: Query
+  def ops: UpdateOperators
+
+  def multi: Boolean
+  def multi(b: Boolean): UpdateOp
+
+  def upsert: Boolean
+  def upsert(b: Boolean): UpdateOp
+
+  def collation: Option[Collation]
+  def collation(c: Collation): UpdateOp
+
+  def arrayFilters: Seq[BSONDocument]
+  def arrayFilters(f: BSONDocument, fs: BSONDocument*): UpdateOp
+}
+
+object UpdateOp {
+  private case class Impl(
+      override val query: Query,
+      override val ops: UpdateOperators,
+      override val upsert: Boolean,
+      override val multi: Boolean,
+      override val collation: Option[Collation],
+      override val arrayFilters: Seq[BSONDocument]
+  ) extends UpdateOp {
+    override def multi(b: Boolean): UpdateOp                                = copy(multi = b)
+    override def upsert(b: Boolean): UpdateOp                               = copy(upsert = b)
+    override def collation(c: Collation): UpdateOp                          = copy(collation = Some(c))
+    override def arrayFilters(f: BSONDocument, fs: BSONDocument*): UpdateOp = copy(arrayFilters = f +: fs)
+  }
+
+  def apply(query: Query, ops: UpdateOperators): UpdateOp = Impl(query, ops, upsert = false, multi = false, None, Nil)
 }
 
 final case class UpdateOperators private (
@@ -48,26 +127,28 @@ final case class UpdateOperators private (
     case s: FieldUpdateOperator.SetOrInsert[_] => copy($setOrInsert = $setOrInsert :+ s)
     case u: FieldUpdateOperator.Unset[_]       => copy($unset = $unset :+ u)
   }
+
+  def bson: BSONDocument = {
+    def e(name: String, s: Seq[FieldUpdateOperator]): ElementProducer = name -> Some(s).filter(_.nonEmpty)
+    document(
+      e("$currentDate", $currentDate),
+      e("$inc", $inc),
+      e("$min", $min),
+      e("$max", $max),
+      e("$mul", $mul),
+      e("$rename", $rename),
+      e("$set", $set),
+      e("$setOrInsert", $setOrInsert),
+      e("$unset", $unset)
+    )
+  }
 }
 
 object UpdateOperators {
   def empty: UpdateOperators                                = UpdateOperators(Nil, Nil, Nil, Nil, Nil, Nil, Nil, Nil, Nil)
   def apply(ops: Seq[FieldUpdateOperator]): UpdateOperators = ops.foldLeft(empty)(_ add _)
 
-  implicit def `BSONWriter[UpdateOperators]` : BSONDocumentWriter[UpdateOperators] = BSONDocumentWriter { op =>
-    def e(name: String, s: Seq[FieldUpdateOperator]): ElementProducer = name -> Some(s).filter(_.nonEmpty)
-    document(
-      e("$currentDate", op.$currentDate),
-      e("$inc", op.$inc),
-      e("$min", op.$min),
-      e("$max", op.$max),
-      e("$mul", op.$mul),
-      e("$rename", op.$rename),
-      e("$set", op.$set),
-      e("$setOrInsert", op.$setOrInsert),
-      e("$unset", op.$unset)
-    )
-  }
+  implicit def `BSONWriter[UpdateOperators]` : BSONDocumentWriter[UpdateOperators] = BSONDocumentWriter(_.bson)
 }
 
 sealed trait FieldUpdateOperator {
@@ -130,23 +211,31 @@ trait UpdateDsl {
 
   implicit class CollectionUpdateOperations[Data[f[_]]](private val collection: HKDBSONCollection[Data]) {
     def update: UpdateOperations[Data]                                                      =
-      UpdateOperations(collection.delegate(_.update), collection.fields)
+      collection.delegate(new UpdateOperations(_, collection.fields)())
     def update(ordered: Boolean): UpdateOperations[Data]                                    =
-      UpdateOperations(collection.delegate(_.update(ordered)), collection.fields)
+      collection.delegate(new UpdateOperations(_, collection.fields)(ordered = ordered))
     def update(writeConcern: WriteConcern): UpdateOperations[Data]                          =
-      UpdateOperations(collection.delegate(_.update(writeConcern)), collection.fields)
+      collection.delegate(new UpdateOperations(_, collection.fields)(writeConcern = writeConcern))
     def update(ordered: Boolean, writeConcern: WriteConcern): UpdateOperations[Data]        =
-      UpdateOperations(collection.delegate(_.update(ordered, writeConcern)), collection.fields)
+      collection.delegate(new UpdateOperations(_, collection.fields)(ordered = ordered, writeConcern = writeConcern))
     def update(ordered: Boolean, bypassDocumentValidation: Boolean): UpdateOperations[Data] =
-      UpdateOperations(collection.delegate(_.update(ordered, bypassDocumentValidation)), collection.fields)
+      collection.delegate(
+        new UpdateOperations(_, collection.fields)(
+          ordered = ordered,
+          bypassDocumentValidation = bypassDocumentValidation
+        )
+      )
     def update(
         ordered: Boolean,
         writeConcern: WriteConcern,
         bypassDocumentValidation: Boolean
     ): UpdateOperations[Data]                                                               =
-      UpdateOperations(
-        collection.delegate(_.update(ordered, writeConcern, bypassDocumentValidation)),
-        collection.fields
+      collection.delegate(
+        new UpdateOperations(_, collection.fields)(
+          ordered = ordered,
+          writeConcern = writeConcern,
+          bypassDocumentValidation = bypassDocumentValidation
+        )
       )
   }
 

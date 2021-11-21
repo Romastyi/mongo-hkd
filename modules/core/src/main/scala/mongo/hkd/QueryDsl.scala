@@ -8,12 +8,12 @@ import reactivemongo.api.bson.collection.BSONCollection
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
-final case class QueryOperations[Data[f[_]]](
+final class QueryOperations[Data[f[_]]](
     private val builder: BSONCollection#QueryBuilder,
     private val fields: Record.RecordFields[Data]
 ) {
   private def options(f: BSONCollection#QueryBuilder => BSONCollection#QueryBuilder): QueryOperations[Data] =
-    QueryOperations(f(builder), fields)
+    new QueryOperations(f(builder), fields)
 
   def projection(projections: (Record.RecordFields[Data] => QueryProjection)*): QueryOperations[Data] =
     options(_.projection(projections.map(_.apply(fields))))
@@ -139,9 +139,9 @@ trait QueryDsl extends QueryDslLowPriorityImplicits {
 
   implicit class CollectionQueryOperations[Data[f[_]]](collection: HKDBSONCollection[Data]) {
     def findAll: QueryOperations[Data]                                              =
-      QueryOperations(collection.delegate(_.find(document)), collection.fields)
+      new QueryOperations(collection.delegate(_.find(document)), collection.fields)
     def findQuery(query: Record.RecordFields[Data] => Query): QueryOperations[Data] =
-      QueryOperations(collection.delegate(_.find(query(collection.fields))), collection.fields)
+      new QueryOperations(collection.delegate(_.find(query(collection.fields))), collection.fields)
   }
 
   implicit class LogicalOperators[A <: Query](left: A) {

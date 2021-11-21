@@ -35,7 +35,7 @@ object InsertWrapper {
     BSONDocumentWriter.from(_.write)
 }
 
-final case class InsertOperations[Data[f[_]], F[_]](private val builder: BSONCollection#InsertBuilder) {
+final class InsertOperations[Data[f[_]], F[_]](private val builder: BSONCollection#InsertBuilder) {
   def one(item: InsertWrapper[Data, F])(implicit ec: ExecutionContext): Future[WriteResult] =
     builder.one(item)
 
@@ -49,21 +49,21 @@ trait InsertDsl {
 
   implicit class CollectionInsertOperations[Data[f[_]]](private val collection: HKDBSONCollection[Data]) {
     def insert[F[_]]: InsertOperations[Data, F]                                                      =
-      InsertOperations(collection.delegate(_.insert))
+      new InsertOperations(collection.delegate(_.insert))
     def insert[F[_]](ordered: Boolean): InsertOperations[Data, F]                                    =
-      InsertOperations(collection.delegate(_.insert(ordered)))
+      new InsertOperations(collection.delegate(_.insert(ordered)))
     def insert[F[_]](writeConcern: WriteConcern): InsertOperations[Data, F]                          =
-      InsertOperations(collection.delegate(_.insert(writeConcern)))
+      new InsertOperations(collection.delegate(_.insert(writeConcern)))
     def insert[F[_]](ordered: Boolean, writeConcern: WriteConcern): InsertOperations[Data, F]        =
-      InsertOperations(collection.delegate(_.insert(ordered, writeConcern)))
+      new InsertOperations(collection.delegate(_.insert(ordered, writeConcern)))
     def insert[F[_]](ordered: Boolean, bypassDocumentValidation: Boolean): InsertOperations[Data, F] =
-      InsertOperations(collection.delegate(_.insert(ordered, bypassDocumentValidation)))
+      new InsertOperations(collection.delegate(_.insert(ordered, bypassDocumentValidation)))
     def insert[F[_]](
         ordered: Boolean,
         writeConcern: WriteConcern,
         bypassDocumentValidation: Boolean
     ): InsertOperations[Data, F]                                                                     =
-      InsertOperations(collection.delegate(_.insert(ordered, writeConcern, bypassDocumentValidation)))
+      new InsertOperations(collection.delegate(_.insert(ordered, writeConcern, bypassDocumentValidation)))
   }
 
 }
