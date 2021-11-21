@@ -183,25 +183,25 @@ class QueryDslTest extends CommonMongoSpec {
     "projection" in withCollection[Data].apply { collection =>
       for {
         found0 <- collection.findAll
-                    .projection(_._id -> 1)
+                    .projection(_._id -> incl)
                     .sort(_.id.asc)
                     .cursor[Option]
                     .collect[List]()
         found1 <- collection.findAll
-                    .projection(_._id -> 0, _.id -> 1)
+                    .projection(_._id -> excl, _.id -> incl)
                     .cursor[Option]
                     .collect[List]()
         found2 <- collection.findAll
-                    .projection(_._id -> 0, _.id -> 1, _.nestedData -> 1)
+                    .projection(_._id -> excl, _.id -> incl, _.nestedData -> incl)
                     .cursor[Option]
                     .collect[List]()
         found3 <- collection.findAll
-                    .projection(_._id -> 1, _.id -> 1, _.nestedData ~ (_.id) -> 1)
+                    .projection(_._id -> incl, _.id -> incl, _.nestedData ~ (_.id) -> incl)
                     .cursor[Option]
                     .collect[List]()
         found4 <- collection
                     .findQuery(_.tags $regex """(tag)\d""")
-                    .projection(_.tags.$ -> 1)
+                    .projection(_.tags.$ -> incl)
                     .cursor[Option]
                     .collect[List]()
         found5 <- collection

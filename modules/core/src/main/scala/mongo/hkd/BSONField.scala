@@ -8,7 +8,7 @@ trait BSONField[A] {
   def fieldName: String
 }
 
-object BSONField extends NestedHKDCodes with DefaultCodecs {
+object BSONField extends NestedHKDCodes with DefaultCodecs with LowPriorityImplicits {
 
   type Fields[Data[f[_]]] = Data[BSONField]
 
@@ -86,4 +86,12 @@ trait DefaultCodecs {
       w.writeTry(value).map(field.fieldName -> _)
   }
 
+}
+
+final case class PositionalArrayField[A, T](field: BSONField[A])
+
+trait LowPriorityImplicits {
+  implicit class PositionalArrayFieldOps[A, T](field: BSONField[A])(implicit f: DerivedFieldType.Array[A, T]) {
+    def $ : PositionalArrayField[A, T] = PositionalArrayField[A, T](BSONField(s"${field.fieldName}.$$"))
+  }
 }

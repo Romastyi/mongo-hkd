@@ -185,7 +185,6 @@ trait QueryDsl extends QueryDslLowPriorityImplicits {
 
 }
 
-@nowarn("msg=is never used")
 trait QueryDslLowPriorityImplicits {
 
   implicit def foldFieldMatches(xs: Seq[FieldMatchExpr[_]]): Query = new Query {
@@ -199,16 +198,21 @@ trait QueryDslLowPriorityImplicits {
   implicit def comparisons[A](field: BSONField[A])(implicit w: BSONWriter[A]): FieldComparisonOperators[A, A] =
     FieldComparisonOperators(field)
 
-  implicit class FieldSimpleProjects[A](field: BSONField[A]) {
-    def ->(w: 1): QueryProjection                  = FieldIncluded(field)
-    def ->(w: 0, unit: Unit = ()): QueryProjection = FieldExcluded(field)
-    // Sorting
-    def asc: QuerySort                             = FieldAscending(field)
-    def desc: QuerySort                            = FieldDescending(field)
-  }
+  sealed trait IncludedField
+  val incl: IncludedField                                                                                          =
+    new IncludedField {}
+  implicit def includedField[A](p: (BSONField[A], IncludedField)): QueryProjection                                 =
+    FieldIncluded(p._1)
+  implicit def includedPositionalArrayField[A, T](p: (PositionalArrayField[A, T], IncludedField)): QueryProjection =
+    FieldIncluded(p._1.field)
 
-  final class PositionalArrayFieldOps[A](field: BSONField[A]) {
-    def ->(w: 1): QueryProjection = FieldIncluded(field)
+  sealed trait ExcludedField
+  val excl: ExcludedField                                                          = new ExcludedField {}
+  implicit def excludedField[A](p: (BSONField[A], ExcludedField)): QueryProjection = FieldExcluded(p._1)
+
+  implicit class FieldSimpleProjects[A](field: BSONField[A]) {
+    def asc: QuerySort  = FieldAscending(field)
+    def desc: QuerySort = FieldDescending(field)
   }
 
   implicit class ArrayFieldsOperators[A, T](field: BSONField[A])(implicit f: DerivedFieldType.Array[A, T]) {
@@ -219,7 +223,6 @@ trait QueryDslLowPriorityImplicits {
       FieldComparison(field, f"$$size", size)
 
     // Projection
-    def $ : PositionalArrayFieldOps[A]            = new PositionalArrayFieldOps(BSONField(s"${field.fieldName}.$$"))
     def slice(n: Int): QueryProjection            = FieldArraySlice(field, n, None)
     def slice(n: Int, skip: Int): QueryProjection = FieldArraySlice(field, n, Some(skip))
   }

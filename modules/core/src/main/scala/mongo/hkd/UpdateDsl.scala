@@ -14,6 +14,15 @@ sealed trait UpdateOpBuilder[Data[f[_]]] {
       op: Record.RecordFields[Data] => FieldUpdateOperator,
       ops: (Record.RecordFields[Data] => FieldUpdateOperator)*
   ): UpdateOp
+
+  def op(
+      query: Record.RecordFields[Data] => Query,
+      update: UpdateOperatorsHKD[Data] => UpdateOperatorsHKD[Data],
+      multi: Boolean = false,
+      upsert: Boolean = false,
+      collation: Option[Collation] = None,
+      arrayFilters: Seq[BSONDocument] = Nil
+  ): UpdateOp
 }
 
 final class UpdateOperations[Data[f[_]]](
@@ -30,6 +39,22 @@ final class UpdateOperations[Data[f[_]]](
       ops: (RecordFields[Data] => FieldUpdateOperator)*
   ): UpdateOp =
     UpdateOp(query(fields), UpdateOperators((op +: ops).map(_.apply(fields))))
+
+  override def op(
+      query: RecordFields[Data] => Query,
+      update: UpdateOperatorsHKD[Data] => UpdateOperatorsHKD[Data],
+      multi: Boolean,
+      upsert: Boolean,
+      collation: Option[Collation],
+      arrayFilters: Seq[BSONDocument]
+  ): UpdateOp = UpdateOp(
+    query = query(fields),
+    ops = update(UpdateOperators(fields)),
+    upsert = upsert,
+    multi = multi,
+    collation = collation,
+    arrayFilters = arrayFilters
+  )
 
   private def builder = coll.update(ordered, writeConcern, bypassDocumentValidation)
 
@@ -56,10 +81,44 @@ final class UpdateOperations[Data[f[_]]](
       ec: ExecutionContext
   ): Future[BSONCollection#UpdateWriteResult] = execute(update(this).multi(false))
 
+  def one(
+      query: Record.RecordFields[Data] => Query,
+      update: UpdateOperatorsHKD[Data] => UpdateOperatorsHKD[Data],
+      upsert: Boolean = false,
+      collation: Option[Collation] = None,
+      arrayFilters: Seq[BSONDocument] = Nil
+  )(implicit ec: ExecutionContext): Future[BSONCollection#UpdateWriteResult] = execute(
+    UpdateOp(
+      query = query(fields),
+      ops = update(UpdateOperators(fields)),
+      upsert = upsert,
+      multi = false,
+      collation = collation,
+      arrayFilters = arrayFilters
+    )
+  )
+
   def many(update: UpdateOpBuilder[Data] => UpdateOp)(implicit
       ec: ExecutionContext
   ): Future[BSONCollection#UpdateWriteResult] =
     execute(update(this).multi(true))
+
+  def many(
+      query: Record.RecordFields[Data] => Query,
+      update: UpdateOperatorsHKD[Data] => UpdateOperatorsHKD[Data],
+      upsert: Boolean = false,
+      collation: Option[Collation] = None,
+      arrayFilters: Seq[BSONDocument] = Nil
+  )(implicit ec: ExecutionContext): Future[BSONCollection#UpdateWriteResult] = execute(
+    UpdateOp(
+      query = query(fields),
+      ops = update(UpdateOperators(fields)),
+      upsert = upsert,
+      multi = true,
+      collation = collation,
+      arrayFilters = arrayFilters
+    )
+  )
 
   def bulk(
       update: UpdateOpBuilder[Data] => UpdateOp,
@@ -103,30 +162,28 @@ object UpdateOp {
   }
 
   def apply(query: Query, ops: UpdateOperators): UpdateOp = Impl(query, ops, upsert = false, multi = false, None, Nil)
+  def apply(
+      query: Query,
+      ops: UpdateOperators,
+      upsert: Boolean,
+      multi: Boolean,
+      collation: Option[Collation],
+      arrayFilters: Seq[BSONDocument]
+  ): UpdateOp                                             = Impl(query, ops, upsert = upsert, multi = multi, collation, arrayFilters)
 }
 
-final case class UpdateOperators private (
-    $currentDate: Seq[FieldUpdateOperator.CurrentDate[_]],
-    $inc: Seq[FieldUpdateOperator.Inc[_]],
-    $min: Seq[FieldUpdateOperator.Min[_]],
-    $max: Seq[FieldUpdateOperator.Max[_]],
-    $mul: Seq[FieldUpdateOperator.Mul[_]],
-    $rename: Seq[FieldUpdateOperator.Rename[_]],
-    $set: Seq[FieldUpdateOperator.Set[_]],
-    $setOrInsert: Seq[FieldUpdateOperator.SetOrInsert[_]],
-    $unset: Seq[FieldUpdateOperator.Unset[_]]
-) {
-  def add(op: FieldUpdateOperator): UpdateOperators = op match {
-    case c: FieldUpdateOperator.CurrentDate[_] => copy($currentDate = $currentDate :+ c)
-    case m: FieldUpdateOperator.Inc[_]         => copy($inc = $inc :+ m)
-    case m: FieldUpdateOperator.Min[_]         => copy($min = $min :+ m)
-    case m: FieldUpdateOperator.Max[_]         => copy($max = $max :+ m)
-    case m: FieldUpdateOperator.Mul[_]         => copy($mul = $mul :+ m)
-    case r: FieldUpdateOperator.Rename[_]      => copy($rename = $rename :+ r)
-    case s: FieldUpdateOperator.Set[_]         => copy($set = $set :+ s)
-    case s: FieldUpdateOperator.SetOrInsert[_] => copy($setOrInsert = $setOrInsert :+ s)
-    case u: FieldUpdateOperator.Unset[_]       => copy($unset = $unset :+ u)
-  }
+sealed trait UpdateOperators {
+  def $currentDate: Seq[FieldUpdateOperator.CurrentDate[_]]
+  def $inc: Seq[FieldUpdateOperator.Inc[_]]
+  def $min: Seq[FieldUpdateOperator.Min[_]]
+  def $max: Seq[FieldUpdateOperator.Max[_]]
+  def $mul: Seq[FieldUpdateOperator.Mul[_]]
+  def $rename: Seq[FieldUpdateOperator.Rename[_]]
+  def $set: Seq[FieldUpdateOperator.Set[_]]
+  def $setOrInsert: Seq[FieldUpdateOperator.SetOrInsert[_]]
+  def $unset: Seq[FieldUpdateOperator.Unset[_]]
+
+  def add(op: FieldUpdateOperator): UpdateOperators
 
   def bson: BSONDocument = {
     def e(name: String, s: Seq[FieldUpdateOperator]): ElementProducer = name -> Some(s).filter(_.nonEmpty)
@@ -144,11 +201,98 @@ final case class UpdateOperators private (
   }
 }
 
-object UpdateOperators {
-  def empty: UpdateOperators                                = UpdateOperators(Nil, Nil, Nil, Nil, Nil, Nil, Nil, Nil, Nil)
-  def apply(ops: Seq[FieldUpdateOperator]): UpdateOperators = ops.foldLeft(empty)(_ add _)
+sealed trait UpdateOperatorsHKD[Data[f[_]]] extends UpdateOperators {
+  def fields: Record.RecordFields[Data]
 
-  implicit def `BSONWriter[UpdateOperators]` : BSONDocumentWriter[UpdateOperators] = BSONDocumentWriter(_.bson)
+  def $currentDate(fs: (Record.RecordFields[Data] => FieldUpdateOperator.CurrentDate[_])*): UpdateOperatorsHKD[Data]
+  def $inc(fs: (Record.RecordFields[Data] => FieldUpdateOperator.Inc[_])*): UpdateOperatorsHKD[Data]
+  def $min(fs: (Record.RecordFields[Data] => FieldUpdateOperator.Min[_])*): UpdateOperatorsHKD[Data]
+  def $max(fs: (Record.RecordFields[Data] => FieldUpdateOperator.Max[_])*): UpdateOperatorsHKD[Data]
+  def $mul(fs: (Record.RecordFields[Data] => FieldUpdateOperator.Mul[_])*): UpdateOperatorsHKD[Data]
+  def $rename(fs: (Record.RecordFields[Data] => FieldUpdateOperator.Rename[_])*): UpdateOperatorsHKD[Data]
+  def $set(fs: (Record.RecordFields[Data] => FieldUpdateOperator.Set[_])*): UpdateOperatorsHKD[Data]
+  def $setOrInsert(fs: (Record.RecordFields[Data] => FieldUpdateOperator.SetOrInsert[_])*): UpdateOperatorsHKD[Data]
+  def $unset(fs: (Record.RecordFields[Data] => FieldUpdateOperator.Unset[_])*): UpdateOperatorsHKD[Data]
+}
+
+object UpdateOperators {
+  private case class Impl(
+      override val $currentDate: Seq[FieldUpdateOperator.CurrentDate[_]],
+      override val $inc: Seq[FieldUpdateOperator.Inc[_]],
+      override val $min: Seq[FieldUpdateOperator.Min[_]],
+      override val $max: Seq[FieldUpdateOperator.Max[_]],
+      override val $mul: Seq[FieldUpdateOperator.Mul[_]],
+      override val $rename: Seq[FieldUpdateOperator.Rename[_]],
+      override val $set: Seq[FieldUpdateOperator.Set[_]],
+      override val $setOrInsert: Seq[FieldUpdateOperator.SetOrInsert[_]],
+      override val $unset: Seq[FieldUpdateOperator.Unset[_]]
+  ) extends UpdateOperators {
+    override def add(op: FieldUpdateOperator): UpdateOperators = op match {
+      case c: FieldUpdateOperator.CurrentDate[_] => copy($currentDate = $currentDate :+ c)
+      case m: FieldUpdateOperator.Inc[_]         => copy($inc = $inc :+ m)
+      case m: FieldUpdateOperator.Min[_]         => copy($min = $min :+ m)
+      case m: FieldUpdateOperator.Max[_]         => copy($max = $max :+ m)
+      case m: FieldUpdateOperator.Mul[_]         => copy($mul = $mul :+ m)
+      case r: FieldUpdateOperator.Rename[_]      => copy($rename = $rename :+ r)
+      case s: FieldUpdateOperator.Set[_]         => copy($set = $set :+ s)
+      case s: FieldUpdateOperator.SetOrInsert[_] => copy($setOrInsert = $setOrInsert :+ s)
+      case u: FieldUpdateOperator.Unset[_]       => copy($unset = $unset :+ u)
+    }
+  }
+
+  final case class ImplHKD[Data[f[_]]](
+      override val fields: Record.RecordFields[Data],
+      override val $currentDate: Seq[FieldUpdateOperator.CurrentDate[_]],
+      override val $inc: Seq[FieldUpdateOperator.Inc[_]],
+      override val $min: Seq[FieldUpdateOperator.Min[_]],
+      override val $max: Seq[FieldUpdateOperator.Max[_]],
+      override val $mul: Seq[FieldUpdateOperator.Mul[_]],
+      override val $rename: Seq[FieldUpdateOperator.Rename[_]],
+      override val $set: Seq[FieldUpdateOperator.Set[_]],
+      override val $setOrInsert: Seq[FieldUpdateOperator.SetOrInsert[_]],
+      override val $unset: Seq[FieldUpdateOperator.Unset[_]]
+  ) extends UpdateOperatorsHKD[Data] {
+    override def add(op: FieldUpdateOperator): UpdateOperators = op match {
+      case c: FieldUpdateOperator.CurrentDate[_] => copy($currentDate = $currentDate :+ c)
+      case m: FieldUpdateOperator.Inc[_]         => copy($inc = $inc :+ m)
+      case m: FieldUpdateOperator.Min[_]         => copy($min = $min :+ m)
+      case m: FieldUpdateOperator.Max[_]         => copy($max = $max :+ m)
+      case m: FieldUpdateOperator.Mul[_]         => copy($mul = $mul :+ m)
+      case r: FieldUpdateOperator.Rename[_]      => copy($rename = $rename :+ r)
+      case s: FieldUpdateOperator.Set[_]         => copy($set = $set :+ s)
+      case s: FieldUpdateOperator.SetOrInsert[_] => copy($setOrInsert = $setOrInsert :+ s)
+      case u: FieldUpdateOperator.Unset[_]       => copy($unset = $unset :+ u)
+    }
+
+    def add(fs: Seq[Record.RecordFields[Data] => FieldUpdateOperator]): UpdateOperatorsHKD[Data] =
+      fs.map(_.apply(fields)).foldLeft(this: UpdateOperators)(_ add _).asInstanceOf[UpdateOperatorsHKD[Data]]
+
+    def $currentDate(fs: (Record.RecordFields[Data] => FieldUpdateOperator.CurrentDate[_])*): UpdateOperatorsHKD[Data] =
+      add(fs)
+    def $inc(fs: (Record.RecordFields[Data] => FieldUpdateOperator.Inc[_])*): UpdateOperatorsHKD[Data]                 =
+      add(fs)
+    def $min(fs: (Record.RecordFields[Data] => FieldUpdateOperator.Min[_])*): UpdateOperatorsHKD[Data]                 =
+      add(fs)
+    def $max(fs: (Record.RecordFields[Data] => FieldUpdateOperator.Max[_])*): UpdateOperatorsHKD[Data]                 =
+      add(fs)
+    def $mul(fs: (Record.RecordFields[Data] => FieldUpdateOperator.Mul[_])*): UpdateOperatorsHKD[Data]                 =
+      add(fs)
+    def $rename(fs: (Record.RecordFields[Data] => FieldUpdateOperator.Rename[_])*): UpdateOperatorsHKD[Data]           =
+      add(fs)
+    def $set(fs: (Record.RecordFields[Data] => FieldUpdateOperator.Set[_])*): UpdateOperatorsHKD[Data]                 =
+      add(fs)
+    def $setOrInsert(fs: (Record.RecordFields[Data] => FieldUpdateOperator.SetOrInsert[_])*): UpdateOperatorsHKD[Data] =
+      add(fs)
+    def $unset(fs: (Record.RecordFields[Data] => FieldUpdateOperator.Unset[_])*): UpdateOperatorsHKD[Data]             =
+      add(fs)
+  }
+
+  def empty: UpdateOperators                                                         = Impl(Nil, Nil, Nil, Nil, Nil, Nil, Nil, Nil, Nil)
+  def apply(ops: Seq[FieldUpdateOperator]): UpdateOperators                          = ops.foldLeft(empty)(_ add _)
+  def apply[Data[f[_]]](fields: Record.RecordFields[Data]): UpdateOperatorsHKD[Data] =
+    ImplHKD(fields, Nil, Nil, Nil, Nil, Nil, Nil, Nil, Nil, Nil)
+
+  implicit def `BSONWriter[UpdateOperators]`[U <: UpdateOperators]: BSONDocumentWriter[U] = BSONDocumentWriter(_.bson)
 }
 
 sealed trait FieldUpdateOperator {
@@ -207,6 +351,7 @@ object FieldUpdateOperator {
     }
 }
 
+@nowarn("msg=is never used")
 trait UpdateDsl {
 
   implicit class CollectionUpdateOperations[Data[f[_]]](private val collection: HKDBSONCollection[Data]) {
@@ -264,5 +409,32 @@ trait UpdateDsl {
     def $inc(number: T): FieldUpdateOperator.Inc[A] = FieldUpdateOperator.Inc(field, number)
     def $mul(number: T): FieldUpdateOperator.Mul[A] = FieldUpdateOperator.Mul(field, number)
   }
+
+  implicit def incField[A, T](p: (BSONField[A], T))(implicit
+      t: DerivedFieldType.Field[A, T],
+      w: BSONWriter[T],
+      n: Numeric[T]
+  ): FieldUpdateOperator.Inc[A]                                                                         =
+    FieldUpdateOperator.Inc(p._1, p._2)
+  implicit def mulField[A, T](p: (BSONField[A], T))(implicit
+      t: DerivedFieldType.Field[A, T],
+      w: BSONWriter[T],
+      n: Numeric[T]
+  ): FieldUpdateOperator.Mul[A]                                                                         =
+    FieldUpdateOperator.Mul(p._1, p._2)
+  implicit def maxField[A](p: (BSONField[A], A))(implicit w: BSONWriter[A]): FieldUpdateOperator.Max[A] =
+    FieldUpdateOperator.Max(p._1, p._2)
+  implicit def minField[A](p: (BSONField[A], A))(implicit w: BSONWriter[A]): FieldUpdateOperator.Min[A] =
+    FieldUpdateOperator.Min(p._1, p._2)
+  implicit def renameField[A](p: (BSONField[A], String)): FieldUpdateOperator.Rename[A]                 =
+    FieldUpdateOperator.Rename(p._1, p._2)
+  implicit def setField[A](p: (BSONField[A], A))(implicit w: BSONWriter[A]): FieldUpdateOperator.Set[A] =
+    FieldUpdateOperator.Set(p._1, p._2)
+  implicit def setOrInsertField[A](p: (BSONField[A], A))(implicit
+      w: BSONWriter[A]
+  ): FieldUpdateOperator.SetOrInsert[A]                                                                 =
+    FieldUpdateOperator.SetOrInsert(p._1, p._2)
+  implicit def unsetField[A](f: BSONField[A]): FieldUpdateOperator.Unset[A]                             =
+    FieldUpdateOperator.Unset(f)
 
 }

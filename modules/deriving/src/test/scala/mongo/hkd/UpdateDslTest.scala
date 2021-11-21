@@ -34,12 +34,11 @@ class UpdateDslTest extends CommonMongoSpec {
         _       <- collection.insert[Ident].one(item)
         found   <- collection.findQuery(_.id $eq item.data.id).requireOne[Ident]
         _       <- collection.update.one(
-                     _.op(_._id $eq item._id)(
-                       _.id $inc 2,
-                       _.name $set "name~",
-                       _.description.$unset,
-                       fs => (fs.nestedData ~ (_.firstField)) $mul 2
-                     )
+                     _._id $eq item._id,
+                     _ $inc (_.id                          -> 2)
+                       $set (_.name                        -> "name~")
+                       $unset (_.description)
+                       $mul (_.nestedData ~ (_.firstField) -> 2L)
                    )
         updated <- collection.findQuery(_._id $eq item._id).requireOne[Ident]
       } yield {
@@ -63,7 +62,7 @@ class UpdateDslTest extends CommonMongoSpec {
         found   <- collection.findQuery(_._id $in (item1._id, item2._id)).cursor[Ident].collect[List]()
         _       <- collection.update.bulk(
                      _.op(_._id $eq item1._id)(_.id $inc 1, _.name $set "name~1"),
-                     _.op(_._id $eq item2._id)(_.id $inc 2, _.name $set "name~2")
+                     _.op(_._id $eq item2._id, _.$inc(_.id -> 2).$set(_.name -> "name~2"))
                    )
         updated <- collection.findQuery(_._id $in (item1._id, item2._id)).cursor[Ident].collect[List]()
       } yield {
