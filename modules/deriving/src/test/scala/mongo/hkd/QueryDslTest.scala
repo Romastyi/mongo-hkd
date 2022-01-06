@@ -122,7 +122,7 @@ class QueryDslTest extends CommonMongoSpec {
                      .collect[List]()
         found1  <- collection
                      .findQuery(_.id $eq 1)
-                     .one[Ident]
+                     .requireOne[Ident]
         found2  <- collection
                      .findQuery(_.id $eq 2)
                      .one[Ident]
@@ -162,8 +162,8 @@ class QueryDslTest extends CommonMongoSpec {
           collection.findQuery(fs => (fs.tags $size 2) $or (fs.otherData $size 2)).cursor[Ident].collect[List]()
       } yield {
         found0.map(_.data) should be(data2 :: data1 :: Nil)
-        found1.map(_._id) should not be Some(oid1)
-        found1.map(_.data) should be(Some(data1))
+        found1._id should not be oid1
+        found1.data should be(data1)
         found2.map(_._id) should be(Some(oid2))
         found2.map(_.data) should be(Some(data2))
         found3.map(_.data) should be(None)
