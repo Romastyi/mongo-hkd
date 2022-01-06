@@ -3,8 +3,8 @@ package mongo.hkd
 import mongo.hkd.Record.RecordFields
 import reactivemongo.api.bson._
 import reactivemongo.api.bson.collection.BSONCollection
-import reactivemongo.api.{Collation, WriteConcern}
 import reactivemongo.api.ext._
+import reactivemongo.api.{Collation, WriteConcern}
 
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}

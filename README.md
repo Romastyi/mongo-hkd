@@ -133,16 +133,29 @@ Examples can be found in [QueryDslTest](modules/deriving/src/test/scala/mongo/hk
 
 The following extensions are similar to the corresponding MongoDB operations:
 
-| Description                                                              | MongoHKD DSL                                        | Original MongoDB operation                 |
-|--------------------------------------------------------------------------|-----------------------------------------------------|--------------------------------------------|
-| Updates a single document within the collection based on the filter      | `collection.update.one(/* query */, /* update */)`  | `collection.updateOne(<query>, <update>)`  |
-| Updates all documents that match the specified filter for the collection | `collection.update.many(/* query */, /* update */)` | `collection.updateMany(<query>, <update>)` |
+| Description                                                              | MongoHKD DSL                                                | Original MongoDB operation                        |
+|--------------------------------------------------------------------------|-------------------------------------------------------------|---------------------------------------------------|
+| Updates a single document within the collection based on the filter      | `collection.update.one(/* query */, /* update */)`          | `collection.updateOne(<query>, <update>)`         |
+| Updates all documents that match the specified filter for the collection | `collection.update.many(/* query */, /* update */)`         | `collection.updateMany(<query>, <update>)`        |
+| Performs multiple write operations with controls for order of execution  | `collection.update.bulk(/* update1 */, /* update2 */, ...)` | `collection.bulkWrite(<update1>, <update2>, ...)` |
 
 The operation can be specified with `ordered`, `writeConcern`, `bypassDocumentValidation`, `upsert`, `collation` and `arrayFilters` parameters.
 
-In addition, several update operations can be done as bulk operation using `collection.update.bulk(/* update1 */, /* update2 */, ...)`.
-
 A detailed example can be found in [UpdateDslTest](modules/deriving/src/test/scala/mongo/hkd/UpdateDslTest.scala).
+
+### Delete DSL
+
+The following extensions are similar to the corresponding MongoDB operations:
+
+| Description                                                              | MongoHKD DSL                                                | Original MongoDB operation                        |
+|--------------------------------------------------------------------------|-------------------------------------------------------------|---------------------------------------------------|
+| Removes a single document from a collection                              | `collection.delete.one(/* query */)`                        | `collection.deleteOne(<query>)`                   |
+| Removes all documents that match the filter from a collection            | `collection.delete.many(/* query */)`                       | `collection.deleteMany(<query>)`                  |
+| Performs multiple delete operations with controls for order of execution | `collection.delete.bulk(/* delete1 */, /* delete2 */, ...)` | `collection.bulkWrite(<delete1>, <delete2>, ...)` |
+
+The operation can be specified with `ordered`, `writeConcern` and `collation` parameters.
+
+A detailed example can be found in [DeleteDslTest](modules/deriving/src/test/scala/mongo/hkd/DeleteDslTest.scala).
 
 ### Index DSL
 
@@ -152,6 +165,7 @@ A detailed example can be found in [IndexDslTest](modules/deriving/src/test/scal
 
 ### TO DO
 
-1. Support for all MongoDB collection methods
-2. More type-safe projections, e.g. projection to a separate data class with type checking
-3. etc.
+1. Scala 3 support (depends on ReactiveMongo status)
+2. Support for all MongoDB collection methods
+3. More type-safe projections, e.g. projection to a separate data class with type checking
+4. etc.
