@@ -1,6 +1,6 @@
 # mongo-hkd
 
-MongoHKD is a fully-typed extension for the (ReactiveMongo)[http://reactivemongo.org/] driver based on Higher-Kinded Data. 
+MongoHKD is a fully-typed extension for the [ReactiveMongo](http://reactivemongo.org/) driver based on Higher-Kinded Data. 
 The library provides BSON codecs deriving and query building DSL very similar to the original MongoDB query DSL.
 
 The base concept is so-called Higher-Kinded Data. You can find description of this concept in this [blog post](https://reasonablypolymorphic.com/blog/higher-kinded-data/) (Haskell) and in this [repo](https://github.com/Michaelt293/higher-kinded-data). 
@@ -154,4 +154,4 @@ A detailed example can be found in [IndexDslTest](modules/deriving/src/test/scal
 
 1. Support for all MongoDB collection methods
 2. More type-safe projections, e.g. projection to a separate data class with type checking
-3. Etc.
+3. etc.
