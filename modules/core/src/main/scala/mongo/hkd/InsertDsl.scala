@@ -11,13 +11,12 @@ import scala.util.Try
 sealed trait InsertWrapper[Data[f[_]], F[_]] {
   def write: Try[BSONDocument]
 }
-final case class InsertDataWrapper[Data[f[_]], F[_]](data: Data[F], implicit val writer: BSONDocumentWriter[Data[F]])
+final case class InsertDataWrapper[Data[f[_]], F[_]](data: Data[F])(implicit writer: BSONDocumentWriter[Data[F]])
     extends InsertWrapper[Data, F]           {
   override def write: Try[BSONDocument] = BSON.writeDocument(data)
 }
-final case class InsertRecordWrapper[Data[f[_]], F[_]](
-    record: BSONRecord[Data, F],
-    implicit val writer: BSONDocumentWriter[BSONRecord[Data, F]]
+final case class InsertRecordWrapper[Data[f[_]], F[_]](record: BSONRecord[Data, F])(implicit
+    writer: BSONDocumentWriter[BSONRecord[Data, F]]
 ) extends InsertWrapper[Data, F] {
   override def write: Try[BSONDocument] = BSON.writeDocument(record)
 }
@@ -26,11 +25,11 @@ object InsertWrapper {
   implicit def insertDataWrapper[Data[f[_]], F[_]](data: Data[F])(implicit
       writer: BSONDocumentWriter[Data[F]]
   ): InsertWrapper[Data, F]                                                                              =
-    InsertDataWrapper(data, writer)
+    InsertDataWrapper(data)
   implicit def insertRecordWrapper[Data[f[_]], F[_]](record: BSONRecord[Data, F])(implicit
       writer: BSONDocumentWriter[BSONRecord[Data, F]]
   ): InsertWrapper[Data, F]                                                                              =
-    InsertRecordWrapper(record, writer)
+    InsertRecordWrapper(record)
   implicit def `BSONWriter[InsertWrapper]`[Data[f[_]], F[_]]: BSONDocumentWriter[InsertWrapper[Data, F]] =
     BSONDocumentWriter.from(_.write)
 }

@@ -45,7 +45,7 @@ class DeleteDslTest extends CommonMongoSpec {
         found3  <- collection.findAll.cursor[Ident].collect[List]()
       } yield {
         found0 shouldBe List(item1, item2, item3, item4)
-        result0.n shouldBe 2 // NOTE: There is a bug in ReactiveMongo driver
+        result0.n shouldBe 2 // NOTE: https://github.com/ReactiveMongo/ReactiveMongo/issues/1096
         found1 shouldBe List(item3, item4)
         result1.n shouldBe 1
         found2 shouldBe List(item4)

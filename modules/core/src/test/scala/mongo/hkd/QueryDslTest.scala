@@ -80,7 +80,7 @@ class QueryDslTest extends CommonMongoSpec {
           |                },
           |                {
           |                  'name': {
-          |                    '$$regex': BSONRegex(/[0-9]+/, )
+          |                    '$$regex': //[0-9]+//
           |                  }
           |                }
           |              ]
@@ -96,7 +96,7 @@ class QueryDslTest extends CommonMongoSpec {
           |        },
           |        {
           |          'description': {
-          |            '$$regex': BSONRegex(/str/, )
+          |            '$$regex': //str//
           |          }
           |        }
           |      ]

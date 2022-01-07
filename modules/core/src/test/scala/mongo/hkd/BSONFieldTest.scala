@@ -12,14 +12,52 @@ import java.util.UUID
 class BSONFieldTest extends AnyFreeSpec with Matchers {
 
   "BSONField" - {
-    "deriving" in {
-      BSONField.fields[Data].nestedData.nested(_.id).fieldName should be("nested_data.id")
-      (BSONField.fields[Data].nestedData ~ (_.id)).fieldName should be("nested_data.id")
-      BSONField.fields[Data].nestedData.nested(_.secondField).fieldName should be("nested_data.second_field")
-      (BSONField.fields[Data].nestedData ~ (_.secondField)).fieldName should be("nested_data.second_field")
-      (BSONField.fields[Data].otherData ~ (_.id)).fieldName should be("other_data.id")
-      (BSONField.fields[Data].otherData ~ (_.secondField)).fieldName should be("other_data.second_field")
+
+    @inline def withNaming[T](naming: String => String)(body: BSONField.Fields[Data] => T): T =
+      body(deriving.fields[Data](naming))
+
+    "deriving" - {
+      "identity" in withNaming(identity) { fields =>
+        fields.id.fieldName should be("id")
+        fields.description.fieldName should be("description")
+        fields.isActive.fieldName should be("isActive")
+        fields.nestedData.fieldName should be("nestedData")
+        fields.otherData.fieldName should be("otherData")
+        fields.nestedData.nested(_.id).fieldName should be("nestedData.id")
+        (fields.nestedData ~ (_.id)).fieldName should be("nestedData.id")
+        fields.nestedData.nested(_.secondField).fieldName should be("nestedData.second_field")
+        (fields.nestedData ~ (_.secondField)).fieldName should be("nestedData.second_field")
+        (fields.otherData ~ (_.id)).fieldName should be("otherData.id")
+        (fields.otherData ~ (_.secondField)).fieldName should be("otherData.second_field")
+      }
+      "snakeCase" in withNaming(renaming.snakeCase) { fields =>
+        fields.id.fieldName should be("id")
+        fields.description.fieldName should be("description")
+        fields.isActive.fieldName should be("is_active")
+        fields.nestedData.fieldName should be("nested_data")
+        fields.otherData.fieldName should be("other_data")
+        fields.nestedData.nested(_.id).fieldName should be("nested_data.id")
+        (fields.nestedData ~ (_.id)).fieldName should be("nested_data.id")
+        fields.nestedData.nested(_.secondField).fieldName should be("nested_data.second_field")
+        (fields.nestedData ~ (_.secondField)).fieldName should be("nested_data.second_field")
+        (fields.otherData ~ (_.id)).fieldName should be("other_data.id")
+        (fields.otherData ~ (_.secondField)).fieldName should be("other_data.second_field")
+      }
+      "kebabCase" in withNaming(renaming.kebabCase) { fields =>
+        fields.id.fieldName should be("id")
+        fields.description.fieldName should be("description")
+        fields.isActive.fieldName should be("is-active")
+        fields.nestedData.fieldName should be("nested-data")
+        fields.otherData.fieldName should be("other-data")
+        fields.nestedData.nested(_.id).fieldName should be("nested-data.id")
+        (fields.nestedData ~ (_.id)).fieldName should be("nested-data.id")
+        fields.nestedData.nested(_.secondField).fieldName should be("nested-data.second_field")
+        (fields.nestedData ~ (_.secondField)).fieldName should be("nested-data.second_field")
+        (fields.otherData ~ (_.id)).fieldName should be("other-data.id")
+        (fields.otherData ~ (_.secondField)).fieldName should be("other-data.second_field")
+      }
     }
+
     "codecs" in {
       val nested    = NestedData[Ident](UUID.randomUUID(), Some(1), None)
       val data      =

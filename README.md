@@ -5,7 +5,7 @@ The library provides BSON codecs deriving and query building DSL very similar to
 
 The base concept is so-called Higher-Kinded Data. You can find description of this concept in this [blog post](https://reasonablypolymorphic.com/blog/higher-kinded-data/) (Haskell) and in this [repo](https://github.com/Michaelt293/higher-kinded-data). 
 
-So at very beginning you need to define data classes describing your data model in Higher-Kinded Data terms, e.g.:
+So at very beginning you need to define case classes describing your data model in Higher-Kinded Data terms, e.g.:
 
 ```scala
 final case class Data[F[_]](
@@ -27,8 +27,8 @@ final case class NestedData[F[_]](
 
 ### BSONField
 
-First of all, you must define instances of your HKD data classes with `BSONField[A]` as `F[_]`, e.g. `Data[BSONField]`. 
-These instances will define namings for all BSON fields of your data classes and will be used further for BSON codecs and query DSL.
+First of all, you must define instances of your HKD case classes with `BSONField[A]` as `F[_]`, e.g. `Data[BSONField]`. 
+These instances will define namings for all BSON fields of your case classes and will be used further for BSON codecs and query DSL.
 These instances can be defined manually or derived automatically, e.g.:
 
 ```scala
@@ -123,7 +123,7 @@ The following extensions are similar to the corresponding MongoDB operations:
 | Description                                    | MongoHKD DSL                                        | Original MongoDB operation                             |
 |------------------------------------------------|-----------------------------------------------------|--------------------------------------------------------|
 | Inserts a document into the collection         | `collection.insert[Ident].one(document)`            | `collection.insertOne(<document>)`                     |
-| Inserts multiple documents into the collection | `collection.insert,many(document1, document2, ...)` | `collection.insertMany(<document1>, <document2>, ...)` |
+| Inserts multiple documents into the collection | `collection.insert.many(document1, document2, ...)` | `collection.insertMany(<document1>, <document2>, ...)` |
 
 The operation can be specified with `ordered`, `writeConcern` and `bypassDocumentValidation` parameters.
 
@@ -165,7 +165,7 @@ A detailed example can be found in [IndexDslTest](modules/deriving/src/test/scal
 
 ### TO DO
 
-1. Scala 3 support (depends on ReactiveMongo status)
-2. Support for all MongoDB collection methods
-3. More type-safe projections, e.g. projection to a separate data class with type checking
-4. etc.
+- [x] Scala 3 support (depends on ReactiveMongo status)
+- [ ] Support for all MongoDB collection methods
+- [ ] More type-safe projections, e.g. projection to a separate case class with type checking
+- [ ] etc.
