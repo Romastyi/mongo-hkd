@@ -59,7 +59,7 @@ class DerivationMacros(val c: blackbox.Context) {
   )(implicit
       wt: c.WeakTypeTag[Data[Any]]
   ): c.Expr[BSONField.Fields[Data]] = {
-    val dt     = weakTypeOf[Data[Any]].typeConstructor
+    val dt     = wttd[Data].typeConstructor
     val field  = reify(c.prefix.splice.asInstanceOf[BSONField[A]])
     val fields = collectCaseClassFields[Data, BSONField].apply { case (sym, _) =>
       val fieldName = sym.name.decodedName.toTermName

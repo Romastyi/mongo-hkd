@@ -13,11 +13,19 @@ class BSONFieldTest extends AnyFreeSpec with Matchers {
 
   "BSONField" - {
 
-    @inline def withNaming[T](naming: String => String)(body: BSONField.Fields[Data] => T): T =
-      body(deriving.fields[Data](naming))
+    case class Fields(private val f: BSONField.Fields[Data], private val n: BSONField.Fields[NestedData]) {
+      implicit val fields: BSONField.Fields[Data]       = f
+      implicit val nested: BSONField.Fields[NestedData] = n
+    }
+
+    @inline def withNaming[T](
+        naming: String => String
+    )(body: Fields => T): T =
+      body(Fields(deriving.fields[Data](naming), deriving.fields[NestedData](naming)))
 
     "deriving" - {
-      "identity" in withNaming(identity) { fields =>
+      "identity" in withNaming(identity) { fs =>
+        import fs._
         fields.id.fieldName should be("id")
         fields.description.fieldName should be("description")
         fields.isActive.fieldName should be("isActive")
@@ -25,12 +33,13 @@ class BSONFieldTest extends AnyFreeSpec with Matchers {
         fields.otherData.fieldName should be("otherData")
         fields.nestedData./.id.fieldName should be("nestedData.id")
         fields.nestedData./.id.fieldName should be("nestedData.id")
-        fields.nestedData./.secondField.fieldName should be("nestedData.second_field")
-        fields.nestedData./.secondField.fieldName should be("nestedData.second_field")
+        fields.nestedData./.secondField.fieldName should be("nestedData.secondField")
+        fields.nestedData./.secondField.fieldName should be("nestedData.secondField")
         fields.otherData./.id.fieldName should be("otherData.id")
-        fields.otherData./.secondField.fieldName should be("otherData.second_field")
+        fields.otherData./.secondField.fieldName should be("otherData.secondField")
       }
-      "snakeCase" in withNaming(renaming.snakeCase) { fields =>
+      "snakeCase" in withNaming(renaming.snakeCase) { fs =>
+        import fs._
         fields.id.fieldName should be("id")
         fields.description.fieldName should be("description")
         fields.isActive.fieldName should be("is_active")
@@ -43,7 +52,8 @@ class BSONFieldTest extends AnyFreeSpec with Matchers {
         fields.otherData./.id.fieldName should be("other_data.id")
         fields.otherData./.secondField.fieldName should be("other_data.second_field")
       }
-      "kebabCase" in withNaming(renaming.kebabCase) { fields =>
+      "kebabCase" in withNaming(renaming.kebabCase) { fs =>
+        import fs._
         fields.id.fieldName should be("id")
         fields.description.fieldName should be("description")
         fields.isActive.fieldName should be("is-active")
@@ -51,10 +61,10 @@ class BSONFieldTest extends AnyFreeSpec with Matchers {
         fields.otherData.fieldName should be("other-data")
         fields.nestedData./.id.fieldName should be("nested-data.id")
         fields.nestedData./.id.fieldName should be("nested-data.id")
-        fields.nestedData./.secondField.fieldName should be("nested-data.second_field")
-        fields.nestedData./.secondField.fieldName should be("nested-data.second_field")
+        fields.nestedData./.secondField.fieldName should be("nested-data.second-field")
+        fields.nestedData./.secondField.fieldName should be("nested-data.second-field")
         fields.otherData./.id.fieldName should be("other-data.id")
-        fields.otherData./.secondField.fieldName should be("other-data.second_field")
+        fields.otherData./.secondField.fieldName should be("other-data.second-field")
       }
     }
 

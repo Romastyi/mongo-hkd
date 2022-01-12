@@ -47,7 +47,9 @@ object Common {
   def module(moduleName: String): Project = Project(moduleName, file("modules") / moduleName)
     .settings(commonSettings)
     .settings(
-      name := s"mongo-hkd-$moduleName"
+      organization := "com.github.romastyi",
+      name         := s"mongo-hkd-$moduleName",
+      version      := "0.0.1"
     )
 
 }

@@ -29,7 +29,7 @@ object deriving {
 
   private def productIter(a: Any): Iterator[Any] = a.asInstanceOf[Product].productIterator
 
-  inline def nested[A, Data[f[_]]](
+  private[hkd] inline def nested[A, Data[f[_]]](
       field: BSONField[A],
       nested: BSONField.Fields[Data]
   ): BSONField.Fields[Data] = summonFrom { case p: Mirror.ProductOf[Data[BSONField]] =>
