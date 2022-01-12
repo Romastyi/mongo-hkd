@@ -10,6 +10,10 @@ class DerivationMacros(val c: blackbox.Context) {
   import c.universe._
 
   type WTTF[F[_]] = WeakTypeTag[F[Unit]]
+  def wttf[F[_]: WTTF]: Type = weakTypeOf[F[Unit]]
+
+  type WTTD[Data[f[_]]] = WeakTypeTag[Data[Any]]
+  def wttd[Data[f[_]]: WTTD]: Type = weakTypeOf[Data[Any]]
 
   private def debug(t: Tree): Tree = {
 //    println(t)
@@ -28,13 +32,11 @@ class DerivationMacros(val c: blackbox.Context) {
     )
   }
 
-  private def collectCaseClassFields[Data[f[_]], F[_]: WTTF](implicit w: WeakTypeTag[Data[Any]]): CaseClassApply =
-    CaseClassApply(w.tpe, appliedType(w.tpe.typeConstructor, weakTypeOf[F[Unit]].typeConstructor))
+  private def collectCaseClassFields[Data[f[_]]: WTTD, F[_]: WTTF]: CaseClassApply =
+    CaseClassApply(wttd[Data], appliedType(wttd[Data].typeConstructor, wttf[F].typeConstructor))
 
-  def fieldsImpl[Data[f[_]]](
-      naming: c.Expr[String => String]
-  )(implicit w: c.WeakTypeTag[Data[Any]]): c.Expr[BSONField.Fields[Data]] = {
-    val dt     = weakTypeOf[Data[Any]].typeConstructor
+  def fieldsImpl[Data[f[_]]: WTTD](naming: c.Expr[String => String]): c.Expr[BSONField.Fields[Data]] = {
+    val dt     = wttd[Data].typeConstructor
     val fields = collectCaseClassFields[Data, BSONField].apply { case (sym, _) =>
       q"""BSONField($naming(${sym.name.decodedName.toString}))"""
     }
@@ -44,16 +46,16 @@ class DerivationMacros(val c: blackbox.Context) {
     )
   }
 
-  def fieldsImplWithNamingResolver[Data[f[_]]](
+  def fieldsImplWithNamingResolver[Data[f[_]]: WTTD](
       resolver: c.Expr[NamingResolver[Data]]
-  )(implicit w: c.WeakTypeTag[Data[Any]]): c.Expr[BSONField.Fields[Data]] =
+  ): c.Expr[BSONField.Fields[Data]] =
     fieldsImpl(resolver)
 
-  def readerImpl[Data[f[_]], F[_]: WTTF](
+  def readerImpl[Data[f[_]]: WTTD, F[_]: WTTF](
       fields: c.Expr[BSONField.Fields[Data]]
-  )(implicit w: c.WeakTypeTag[Data[Any]]): c.Expr[BSONDocumentReader[Data[F]]] = {
-    val ft        = weakTypeOf[F[Unit]].typeConstructor
-    val dt        = weakTypeOf[Data[Any]].typeConstructor
+  ): c.Expr[BSONDocumentReader[Data[F]]] = {
+    val ft        = wttf[F].typeConstructor
+    val dt        = wttd[Data].typeConstructor
     val fs        = collectCaseClassFields[Data, F].apply { case (sym, idx) =>
       val fieldType = sym.typeSignature
       val fieldName = sym.name.decodedName.toTermName
@@ -71,11 +73,11 @@ class DerivationMacros(val c: blackbox.Context) {
     }
   }
 
-  def writerImpl[Data[f[_]], F[_]: WTTF](
+  def writerImpl[Data[f[_]]: WTTD, F[_]: WTTF](
       fields: c.Expr[BSONField.Fields[Data]]
-  )(implicit w: c.WeakTypeTag[Data[Any]]): c.Expr[BSONDocumentWriter[Data[F]]] = {
-    val ft      = weakTypeOf[F[Unit]].typeConstructor
-    val dt      = weakTypeOf[Data[Any]].typeConstructor
+  ): c.Expr[BSONDocumentWriter[Data[F]]] = {
+    val ft      = wttf[F].typeConstructor
+    val dt      = wttd[Data].typeConstructor
     val writers = collectCaseClassFields[Data, F].apply { case (sym, _) =>
       q"""implicitly[BSONWriter[${sym.typeSignature}]]"""
     }
