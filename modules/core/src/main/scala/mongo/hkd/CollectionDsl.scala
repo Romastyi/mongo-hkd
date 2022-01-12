@@ -1,7 +1,7 @@
 package mongo.hkd
 
-import reactivemongo.api.{DB, FailoverStrategy}
 import reactivemongo.api.bson.BSONObjectID
+import reactivemongo.api.{DB, FailoverStrategy}
 
 trait CollectionDsl {
 
@@ -12,7 +12,7 @@ trait CollectionDsl {
       HKDBSONCollection(db.collection(name, failoverStrategy))
   }
 
-  implicit class BSONRecordOps[Data[f[_]], F[_]](private val data: Data[F]) {
+  implicit class BSONRecordOps[Data[f[_]]: BSONField.Fields, F[_]](private val data: Data[F]) {
     def record(_id: F[BSONObjectID]): BSONRecord[Data, F] = BSONRecord(_id, data)
   }
 

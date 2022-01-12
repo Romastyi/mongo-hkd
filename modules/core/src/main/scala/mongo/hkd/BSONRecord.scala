@@ -4,11 +4,10 @@ import reactivemongo.api.bson._
 
 sealed trait Record
 
-object Record {
+object Record extends RecordCompat {
   private[hkd] val idField: BSONField[BSONObjectID] = BSONField("_id")
 
   type AsRecord[Data[f[_]], F[_]] = Data[F] with Record
-  type RecordFields[Data[f[_]]]   = BSONField.Fields[AsRecord[Data, *[_]]]
 
   def asRecord[Data[f[_]], F[_]](data: Data[F]): AsRecord[Data, F] = data.asInstanceOf[AsRecord[Data, F]]
 
