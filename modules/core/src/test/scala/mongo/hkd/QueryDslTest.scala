@@ -38,7 +38,7 @@ class QueryDslTest extends CommonMongoSpec {
     "match dsl" in {
       val query1: Query = (fields.name m "name") ::
         (fields.isActive m true) ::
-        ((fields.nestedData ~ (_.secondField)) m Some("one")) ::
+        (fields.nestedData./.secondField m Some("one")) ::
         Nil
       pretty(query1.bson) should be("""{
           |  'name': 'name',
@@ -64,7 +64,7 @@ class QueryDslTest extends CommonMongoSpec {
         (((fields.name $eq "name") $or (fields.name $regex "/[0-9]+/"))
           $and (fields.isActive $not (_ $eq true))
           $and (fields.description $regex "/str/")) $or
-          ((fields.nestedData ~ (_.secondField)) $in (Some("one"), Some("two"), None))
+          (fields.nestedData./.secondField $in (Some("one"), Some("two"), None))
       pretty(query.bson) should be(f"""{
           |  '$$or': [
           |    {
@@ -141,11 +141,11 @@ class QueryDslTest extends CommonMongoSpec {
                      .findQuery(_.nestedData m nested1)
                      .requireOne[Ident]
         found7  <- collection
-                     .findQuery(_.nestedData ~ (_.id) $in (uuid1, uuid2))
+                     .findQuery(_.nestedData./.id $in (uuid1, uuid2))
                      .cursor[Ident]
                      .collect[List]()
         found8  <- collection
-                     .findQuery(_.nestedData ~ (_.id) $not (_ $eq uuid1))
+                     .findQuery(_.nestedData./.id $not (_ $eq uuid1))
                      .cursor[Ident]
                      .collect[List]()
         found9  <- collection
@@ -196,7 +196,7 @@ class QueryDslTest extends CommonMongoSpec {
                     .cursor[Option]
                     .collect[List]()
         found3 <- collection.findAll
-                    .projection(_._id -> incl, _.id -> incl, _.nestedData ~ (_.id) -> incl)
+                    .projection(_._id -> incl, _.id -> incl, _.nestedData./.id -> incl)
                     .cursor[Option]
                     .collect[List]()
         found4 <- collection

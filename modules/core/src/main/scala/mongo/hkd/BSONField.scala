@@ -4,7 +4,7 @@ import reactivemongo.api.bson._
 
 import scala.util.Try
 
-trait BSONField[A] {
+trait BSONField[A] extends BSONFieldCompat[A] {
   def fieldName: String
 }
 
@@ -12,24 +12,14 @@ object BSONField extends DefaultCodecs with LowPriorityImplicits {
 
   type Fields[Data[f[_]]] = Data[BSONField]
 
-  private case class Impl[A](override val fieldName: String)                extends BSONField[A]
-  private case class Nested[A, B](base: BSONField[A], nested: BSONField[B]) extends BSONField[B] {
+  private case class Impl[A](override val fieldName: String)                     extends BSONField[A]
+  private[hkd] case class Nested[A, B](base: BSONField[A], nested: BSONField[B]) extends BSONField[B] {
     override val fieldName: String = s"""${base.fieldName}.${nested.fieldName}"""
   }
 
   def apply[A](fieldName: String): BSONField[A] = Impl(fieldName)
 
   def fields[Data[f[_]]](implicit inst: Fields[Data]): Fields[Data] = inst
-
-  implicit class BSONFieldSyntax[T, Data[f[_]]](field: BSONField[T])(implicit
-      w: DerivedFieldType.Nested[T, Data],
-      fields: BSONField.Fields[Data]
-  ) {
-    def nested[A](accessor: Fields[Data] => BSONField[A]): BSONField[A] =
-      Nested(field, accessor(fields))
-
-    @inline def ~[A](accessor: Fields[Data] => BSONField[A]): BSONField[A] = nested(accessor)
-  }
 
 }
 

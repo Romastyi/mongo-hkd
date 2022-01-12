@@ -15,7 +15,7 @@ class IndexDslTest extends CommonMongoSpec {
                    ), // Will not create any additional index, only duplicates the default index by `_id` field.
                    _.name.hashed.index(name = Some("idx1")),
                    fs => List(fs.name.text.weight(10), fs.description.text).index(name = Some("idx2")),
-                   fs => (fs.nestedData ~ (_.id)).hashed.index(),
+                   fs => fs.nestedData./.id.hashed.index(),
                    _.isActive.ascending.index(name = Some("idx4"), unique = true, sparse = true)
                  )
       indices <- collection.delegate(_.indexesManager.list())

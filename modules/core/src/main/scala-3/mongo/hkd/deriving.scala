@@ -29,6 +29,18 @@ object deriving {
 
   private def productIter(a: Any): Iterator[Any] = a.asInstanceOf[Product].productIterator
 
+  inline def nested[A, Data[f[_]]](
+      field: BSONField[A],
+      nested: BSONField.Fields[Data]
+  ): BSONField.Fields[Data] = summonFrom { case p: Mirror.ProductOf[Data[BSONField]] =>
+    val pack = productIter(nested).map(f => BSONField.Nested(field, f.asInstanceOf[BSONField[Any]])).toSeq
+    p.fromProduct(new {
+      def productArity           = pack.length
+      def canEqual(that: Any)    = true
+      def productElement(i: Int) = pack(i)
+    })
+  }
+
   trait Reader[Data[f[_]], F[_]] {
     inline given (using fields: BSONField.Fields[Data]): BSONDocumentReader[Data[F]] = reader[Data, F]
   }

@@ -1,8 +1,9 @@
 package mongo.hkd.macros
 
-import mongo.hkd.BSONField
+import mongo.hkd.{BSONField, DerivedFieldType}
 import reactivemongo.api.bson.{BSONDocumentReader, BSONDocumentWriter}
 
+import scala.annotation.nowarn
 import scala.reflect.macros.blackbox
 
 class DerivationMacros(val c: blackbox.Context) {
@@ -50,6 +51,25 @@ class DerivationMacros(val c: blackbox.Context) {
       resolver: c.Expr[NamingResolver[Data]]
   ): c.Expr[BSONField.Fields[Data]] =
     fieldsImpl(resolver)
+
+  @nowarn("msg=is never used")
+  def nestedImpl[A: c.WeakTypeTag, Data[f[_]]](
+      w: c.Expr[DerivedFieldType.Nested[A, Data]],
+      nested: c.Expr[BSONField.Fields[Data]]
+  )(implicit
+      wt: c.WeakTypeTag[Data[Any]]
+  ): c.Expr[BSONField.Fields[Data]] = {
+    val dt     = weakTypeOf[Data[Any]].typeConstructor
+    val field  = reify(c.prefix.splice.asInstanceOf[BSONField[A]])
+    val fields = collectCaseClassFields[Data, BSONField].apply { case (sym, _) =>
+      val fieldName = sym.name.decodedName.toTermName
+      q"""BSONField.Nested($field, $nested.$fieldName)"""
+    }
+
+    c.Expr[BSONField.Fields[Data]](
+      debug(q"""new $dt(..$fields)""")
+    )
+  }
 
   def readerImpl[Data[f[_]]: WTTD, F[_]: WTTF](
       fields: c.Expr[BSONField.Fields[Data]]
