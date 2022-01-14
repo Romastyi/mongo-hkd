@@ -114,7 +114,7 @@ The following extensions are similar to the corresponding MongoDB operations:
 
 The operation can be additionally specified with `projection` and `sort`.
 
-A detailed example can be found in [QueryDslTest](modules/deriving/src/test/scala/mongo/hkd/QueryDslTest.scala).
+A detailed example can be found in [QueryDslTest](modules/core/src/test/scala/mongo/hkd/QueryDslTest.scala).
 
 ### Insert DSL
 
@@ -127,7 +127,7 @@ The following extensions are similar to the corresponding MongoDB operations:
 
 The operation can be specified with `ordered`, `writeConcern` and `bypassDocumentValidation` parameters.
 
-Examples can be found in [QueryDslTest](modules/deriving/src/test/scala/mongo/hkd/QueryDslTest.scala) and [UpdateDslTest](modules/deriving/src/test/scala/mongo/hkd/UpdateDslTest.scala).
+Examples can be found in [QueryDslTest](modules/core/src/test/scala/mongo/hkd/QueryDslTest.scala) and [UpdateDslTest](modules/core/src/test/scala/mongo/hkd/UpdateDslTest.scala).
 
 ### Update DSL
 
@@ -141,7 +141,7 @@ The following extensions are similar to the corresponding MongoDB operations:
 
 The operation can be specified with `ordered`, `writeConcern`, `bypassDocumentValidation`, `upsert`, `collation` and `arrayFilters` parameters.
 
-A detailed example can be found in [UpdateDslTest](modules/deriving/src/test/scala/mongo/hkd/UpdateDslTest.scala).
+A detailed example can be found in [UpdateDslTest](modules/core/src/test/scala/mongo/hkd/UpdateDslTest.scala).
 
 ### Delete DSL
 
@@ -155,17 +155,18 @@ The following extensions are similar to the corresponding MongoDB operations:
 
 The operation can be specified with `ordered`, `writeConcern` and `collation` parameters.
 
-A detailed example can be found in [DeleteDslTest](modules/deriving/src/test/scala/mongo/hkd/DeleteDslTest.scala).
+A detailed example can be found in [DeleteDslTest](modules/core/src/test/scala/mongo/hkd/DeleteDslTest.scala).
 
 ### Index DSL
 
 The library provides operation `collection.ensureIndices(/* index1 */, /* index2 */, ...)` which corresponds to a batch of `collection.ensureIndex()` operations. 
 
-A detailed example can be found in [IndexDslTest](modules/deriving/src/test/scala/mongo/hkd/IndexDslTest.scala).
+A detailed example can be found in [IndexDslTest](modules/core/src/test/scala/mongo/hkd/IndexDslTest.scala).
 
 ### TO DO
 
 - [x] Scala 3 support (depends on ReactiveMongo status)
+- [ ] Support sealed trait hierarchy
 - [ ] Support for all MongoDB collection methods
 - [ ] More type-safe projections, e.g. projection to a separate case class with type checking
 - [ ] etc.
