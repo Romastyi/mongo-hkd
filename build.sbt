@@ -14,10 +14,10 @@ lazy val core = module("core")
       case Scala3 => Nil
     } ++ Seq(
       "org.scalatest"              %% "scalatest"                      % "3.2.9"   % Test,
-      "com.dimafeng"               %% "testcontainers-scala-scalatest" % "0.39.12" % Test,
-      "com.dimafeng"               %% "testcontainers-scala-mongodb"   % "0.39.12" % Test,
+      "com.dimafeng"               %% "testcontainers-scala-scalatest" % "0.40.0" % Test,
+      "com.dimafeng"               %% "testcontainers-scala-mongodb"   % "0.40.0" % Test,
       "org.apache.logging.log4j"    % "log4j-core"                     % "2.17.0"  % Test,
-      "org.slf4j"                   % "slf4j-simple"                   % "1.7.32"  % Test,
+      "org.slf4j"                   % "slf4j-simple"                   % "1.7.35"  % Test,
       "com.softwaremill.quicklens" %% "quicklens"                      % "1.8.2"   % Test
     )
   )
