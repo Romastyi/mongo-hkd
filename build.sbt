@@ -4,7 +4,7 @@ import sbt._
 lazy val core = module("core")
   .settings(
     libraryDependencies ++= Seq(
-      "org.reactivemongo" %% "reactivemongo" % "1.1.0-RC2"
+      "org.reactivemongo" %% "reactivemongo" % "1.1.0-RC3"
     ) ++ byScalaVersion(scalaVersion.value) {
       case Scala2 =>
         Seq(
