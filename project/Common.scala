@@ -4,7 +4,7 @@ import sbt._
 
 object Common {
   val scala213 = "2.13.7"
-  val scala31  = "3.1.2-RC1" // "3.1.0"
+  val scala31  = "3.1.3-RC4" // "3.1.0"
 
   sealed trait ScalaVersion
   case object Scala2 extends ScalaVersion
