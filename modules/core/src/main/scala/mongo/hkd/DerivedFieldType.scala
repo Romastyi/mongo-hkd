@@ -2,12 +2,10 @@ package mongo.hkd
 
 import reactivemongo.api.bson._
 
-import scala.annotation.nowarn
 import scala.collection.Factory
 
 sealed trait DerivedFieldType[A, T, +E]
 
-@nowarn("msg=is never used")
 object DerivedFieldType extends DerivedFieldTypeLowPriorityImplicits {
 
   sealed trait SimpleField
@@ -36,7 +34,6 @@ object DerivedFieldType extends DerivedFieldTypeLowPriorityImplicits {
   ): DerivedFieldType.Nested[Data[BSONField], Data]           = null
 }
 
-@nowarn("msg=is never used")
 sealed trait DerivedFieldTypeLowPriorityImplicits {
   implicit def derivedProduct[A, Repr <: Product](implicit ev: Repr ¬ Option[A]): DerivedFieldType.Field[Repr, Repr] =
     null

@@ -305,7 +305,6 @@ object FieldUpdateOperator {
   object SetAsTimestamp   extends CurrentDateTypeSpecification
   object SetAsDate        extends CurrentDateTypeSpecification
 
-  @nowarn("msg=is never used")
   object CurrentDateTypeSpecification {
     implicit def setToCurrentDate(b: true): CurrentDateTypeSpecification      = SetToCurrentDate
     implicit def setAsTimestamp(t: "timestamp"): CurrentDateTypeSpecification = SetAsTimestamp
