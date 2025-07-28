@@ -1,13 +1,15 @@
 package mongo.hkd
 
-import reactivemongo.api.bson._
+import reactivemongo.api.bson.*
 
-import scala.compiletime._
-import scala.deriving._
+import scala.compiletime.*
+import scala.deriving.*
+import scala.annotation.nowarn
 
+@nowarn
 object deriving {
 
-  private inline def summonFields[T <: Tuple](naming: String => String): List[BSONField[_]] =
+  private inline def summonFields[T <: Tuple](naming: String => String): List[BSONField[?]] =
     inline erasedValue[T] match {
       case _: EmptyTuple => Nil
       case _: (t *: ts)  => BSONField(naming(constValue[t].asInstanceOf[String])) :: summonFields[ts](naming)
@@ -45,7 +47,7 @@ object deriving {
     inline given (using fields: BSONField.Fields[Data]): BSONDocumentReader[Data[F]] = reader[Data, F]
   }
 
-  private inline def summonReaders[T <: Tuple]: List[BSONReader[_]] = inline erasedValue[T] match {
+  private inline def summonReaders[T <: Tuple]: List[BSONReader[?]] = inline erasedValue[T] match {
     case _: EmptyTuple => Nil
     case _: (t *: ts)  => summonInline[BSONReader[t]] :: summonReaders[ts]
   }
@@ -70,7 +72,7 @@ object deriving {
     inline given (using fields: BSONField.Fields[Data]): BSONDocumentWriter[Data[F]] = writer[Data, F]
   }
 
-  private inline def summonWriters[T <: Tuple]: List[BSONWriter[_]] = inline erasedValue[T] match {
+  private inline def summonWriters[T <: Tuple]: List[BSONWriter[?]] = inline erasedValue[T] match {
     case _: EmptyTuple => Nil
     case _: (t *: ts)  => summonInline[BSONWriter[t]] :: summonWriters[ts]
   }

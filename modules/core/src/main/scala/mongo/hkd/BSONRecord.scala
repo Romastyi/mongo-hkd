@@ -1,13 +1,13 @@
 package mongo.hkd
 
-import reactivemongo.api.bson._
+import reactivemongo.api.bson.*
 
 sealed trait Record
 
 object Record extends RecordCompat {
   private[hkd] val idField: BSONField[BSONObjectID] = BSONField("_id")
 
-  type AsRecord[Data[f[_]], F[_]] = Data[F] with Record
+  type AsRecord[Data[f[_]], F[_]] = Data[F] & Record
 
   def asRecord[Data[f[_]], F[_]](data: Data[F]): AsRecord[Data, F] = data.asInstanceOf[AsRecord[Data, F]]
 

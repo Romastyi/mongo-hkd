@@ -2,10 +2,9 @@ package mongo.hkd
 
 import reactivemongo.api.Cursor.WithOps
 import reactivemongo.api.ReadPreference
-import reactivemongo.api.bson._
+import reactivemongo.api.bson.*
 import reactivemongo.api.bson.collection.BSONCollection
 
-import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
 final class QueryOperations[Data[f[_]]](
@@ -91,15 +90,15 @@ final case class ElemMatch[A](override val field: BSONField[A], query: Query) ex
 }
 
 final case class FieldComparisonOperators[A, V](field: BSONField[A])(implicit w: BSONWriter[V]) {
-  def $eq(value: V): FieldComparison[A]                                  = FieldComparison(field, "$eq", value)
-  def $ne(value: V): FieldComparison[A]                                  = FieldComparison(field, "$ne", value)
-  def $gt(value: V): FieldComparison[A]                                  = FieldComparison(field, "$gt", value)
-  def $gte(value: V): FieldComparison[A]                                 = FieldComparison(field, "$gte", value)
-  def $lt(value: V): FieldComparison[A]                                  = FieldComparison(field, "$lt", value)
-  def $lte(value: V): FieldComparison[A]                                 = FieldComparison(field, "$lte", value)
-  def $in(value: V, others: V*): FieldComparison[A]                      = FieldComparison(field, "$in", value +: others)
-  def $nin(value: V, others: V*): FieldComparison[A]                     = FieldComparison(field, "$nin", value +: others)
-  def $not(expr: BSONField[A] => FieldComparison[A]): FieldComparison[A] =
+  infix def $eq(value: V): FieldComparison[A]                                  = FieldComparison(field, "$eq", value)
+  infix def $ne(value: V): FieldComparison[A]                                  = FieldComparison(field, "$ne", value)
+  infix def $gt(value: V): FieldComparison[A]                                  = FieldComparison(field, "$gt", value)
+  infix def $gte(value: V): FieldComparison[A]                                 = FieldComparison(field, "$gte", value)
+  infix def $lt(value: V): FieldComparison[A]                                  = FieldComparison(field, "$lt", value)
+  infix def $lte(value: V): FieldComparison[A]                                 = FieldComparison(field, "$lte", value)
+  infix def $in(value: V, others: V*): FieldComparison[A]                      = FieldComparison(field, "$in", value +: others)
+  infix def $nin(value: V, others: V*): FieldComparison[A]                     = FieldComparison(field, "$nin", value +: others)
+  infix def $not(expr: BSONField[A] => FieldComparison[A]): FieldComparison[A] =
     FieldComparison(field, "$not", expr(field).expr)
 }
 
@@ -117,7 +116,7 @@ object QueryProjection {
       case FieldArraySlice(field, n, None)       => BSONElement(field.fieldName, document("$slice" -> n))
       case FieldArraySlice(field, n, Some(skip)) => BSONElement(field.fieldName, document("$slice" -> List(n, skip)))
       case FieldArrayElemMatch(elemMatch)        => elemMatch.bson
-    }: _*)
+    }*)
   }
 }
 
@@ -130,12 +129,11 @@ object QuerySort {
     document(xs.map {
       case FieldAscending(field)  => BSONElement(field.fieldName, 1)
       case FieldDescending(field) => BSONElement(field.fieldName, -1)
-    }: _*)
+    }*)
   }
 }
 
-@nowarn("msg=is never used")
-trait QueryDsl extends QueryDslLowPriorityImplicits {
+trait QueryDsl extends QueryDslLowPriorityImplicits with Compat {
 
   implicit class CollectionQueryOperations[Data[f[_]]](collection: HKDBSONCollection[Data]) {
     def findAll: QueryOperations[Data]                                              =
@@ -145,15 +143,15 @@ trait QueryDsl extends QueryDslLowPriorityImplicits {
   }
 
   implicit class LogicalOperators[A <: Query](left: A) {
-    def $and[B <: Query](right: B): LogicalOperator[A, B] = LogicalOperator(left, right, "$and")
-    def $nor[B <: Query](right: B): LogicalOperator[A, B] = LogicalOperator(left, right, "$nor")
-    def $or[B <: Query](right: B): LogicalOperator[A, B]  = LogicalOperator(left, right, "$or")
+    infix def $and[B <: Query](right: B): LogicalOperator[A, B] = LogicalOperator(left, right, "$and")
+    infix def $nor[B <: Query](right: B): LogicalOperator[A, B] = LogicalOperator(left, right, "$nor")
+    infix def $or[B <: Query](right: B): LogicalOperator[A, B]  = LogicalOperator(left, right, "$or")
   }
 
   implicit class NestedFieldMatches[A, Data[f[_]]](field: BSONField[A])(implicit
       f: DerivedFieldType.Nested[A, Data]
   ) {
-    def m[F[_]](value: Data[F])(implicit w: BSONWriter[Data[F]]): FieldMatchExpr[A] =
+    infix def m[F[_]](value: Data[F])(implicit w: BSONWriter[Data[F]]): FieldMatchExpr[A] =
       FieldMatchExpr(field, w.writeTry(value).get)
   }
 
@@ -161,7 +159,7 @@ trait QueryDsl extends QueryDslLowPriorityImplicits {
     new StringComparisons[({ type id[x] = x })#id](field)
 
   implicit class StringComparisons[F[_]](field: BSONField[F[String]]) {
-    def $regex(regex: String, flags: String = ""): FieldComparison[F[String]] =
+    infix def $regex(regex: String, flags: String = ""): FieldComparison[F[String]] =
       FieldComparison(field, f"""$$regex""", BSONRegex(regex, flags))
   }
 
@@ -174,25 +172,25 @@ trait QueryDsl extends QueryDslLowPriorityImplicits {
       w: DerivedFieldType.Array[A, Data[BSONField]],
       fields: BSONField.Fields[Data]
   ) {
-    def $all(
+    infix def $all(
         elem: BSONField[A] => ElemMatch[A],
         elems: (BSONField[A] => ElemMatch[A])*
-    ): FieldComparison[A]                                                =
+    ): FieldComparison[A]                                                      =
       FieldComparison(field, "$all", (elem +: elems).map(_.apply(field)).map(_.expr))
-    def $size(size: Int): FieldComparison[A]                             = FieldComparison(field, f"$$size", size)
-    def $elemMatch(query: BSONField.Fields[Data] => Query): ElemMatch[A] = ElemMatch(field, query(fields))
+    infix def $size(size: Int): FieldComparison[A]                             = FieldComparison(field, f"$$size", size)
+    infix def $elemMatch(query: BSONField.Fields[Data] => Query): ElemMatch[A] = ElemMatch(field, query(fields))
   }
 
 }
 
 trait QueryDslLowPriorityImplicits {
 
-  implicit def foldFieldMatches(xs: Seq[FieldMatchExpr[_]]): Query = new Query {
-    override def bson: BSONDocument = document(xs.map(_.elem): _*)
+  implicit def foldFieldMatches(xs: Seq[FieldMatchExpr[?]]): Query = new Query {
+    override def bson: BSONDocument = document(xs.map(_.elem)*)
   }
 
   implicit class FieldMatches[A](field: BSONField[A])(implicit w: BSONWriter[A]) {
-    def m(value: A): FieldMatchExpr[A] = FieldMatchExpr(field, value)
+    infix def m(value: A): FieldMatchExpr[A] = FieldMatchExpr(field, value)
   }
 
   implicit def comparisons[A](field: BSONField[A])(implicit w: BSONWriter[A]): FieldComparisonOperators[A, A] =
@@ -217,14 +215,14 @@ trait QueryDslLowPriorityImplicits {
 
   implicit class ArrayFieldsOperators[A, T](field: BSONField[A])(implicit f: DerivedFieldType.Array[A, T]) {
     // Query
-    def $all(value: T, others: T*)(implicit w: BSONWriter[T]): FieldComparison[A] =
+    infix def $all(value: T, others: T*)(implicit w: BSONWriter[T]): FieldComparison[A] =
       FieldComparison(field, "$all", value +: others)
-    def $size(size: Int): FieldComparison[A]                                      =
+    infix def $size(size: Int): FieldComparison[A]                                      =
       FieldComparison(field, f"$$size", size)
 
     // Projection
-    def slice(n: Int): QueryProjection            = FieldArraySlice(field, n, None)
-    def slice(n: Int, skip: Int): QueryProjection = FieldArraySlice(field, n, Some(skip))
+    infix def slice(n: Int): QueryProjection            = FieldArraySlice(field, n, None)
+    infix def slice(n: Int, skip: Int): QueryProjection = FieldArraySlice(field, n, Some(skip))
   }
 
   implicit def elemMatchProjection[A](elemMatch: ElemMatch[A]): QueryProjection =
