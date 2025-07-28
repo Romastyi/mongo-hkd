@@ -1,6 +1,6 @@
 package mongo.hkd
 
-import mongo.hkd.dsl._
+import mongo.hkd.dsl.*
 import org.scalatest.Inside.inside
 import reactivemongo.api.bson.document
 import reactivemongo.api.indexes.IndexType

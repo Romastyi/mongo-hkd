@@ -1,10 +1,10 @@
 import org.scalafmt.sbt.ScalafmtPlugin.autoImport.scalafmtOnCompile
-import sbt.Keys._
-import sbt._
+import sbt.Keys.*
+import sbt.*
 
 object Common {
-  val scala213 = "2.13.10"
-  val scala31  = "3.2.1"
+  val scala213 = "2.13.16"
+  val scala36  = "3.6.3"
 
   sealed trait ScalaVersion
   case object Scala2 extends ScalaVersion
@@ -22,11 +22,26 @@ object Common {
 
   val baseSettings = Seq(
     scalaVersion       := scala213,
-    crossScalaVersions := Seq(scala213, scala31),
+    crossScalaVersions := Seq(scala213, scala36),
     crossVersion       := CrossVersion.binary,
+    scalacOptions --= byScalaVersion(scalaVersion.value) {
+      case Scala2 => Nil
+      case Scala3 => Seq("-Ykind-projector")
+    },
     scalacOptions ++= byScalaVersion(scalaVersion.value) {
-      case Scala2 => Seq("-Ymacro-annotations")
-      case Scala3 => Nil
+      case Scala2 =>
+        Seq(
+          "-Ymacro-annotations",
+          "-Xsource:3",
+          "-Xsource-features:case-apply-copy-access",
+          "-Wconf:msg=unused value of type org.scalatest.Assertion:s",
+        )
+      case Scala3 =>
+        Seq(
+          "-Wconf:msg=unused implicit parameter:s",
+          "-Wconf:msg=unused value of type org.scalatest.Assertion:s",
+          "-Xkind-projector"
+        )
     },
     scalafmtOnCompile  := true
   )
@@ -39,7 +54,7 @@ object Common {
       unmanaged(scalaVersion.value, (Test / sourceDirectory).value)
     },
     libraryDependencies ++= byScalaVersion(scalaVersion.value) {
-      case Scala2 => Seq(compilerPlugin("org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full))
+      case Scala2 => Seq(compilerPlugin("org.typelevel" % "kind-projector" % "0.13.3" cross CrossVersion.full))
       case Scala3 => Nil
     }
   )

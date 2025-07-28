@@ -7,6 +7,8 @@ trait BSONFieldCompat[A] { self: BSONField[A] =>
   ): BSONField.Fields[Data] = deriving.nested(self, nested)
 }
 
-trait RecordCompat {
+trait RecordCompat extends Compat {
   type RecordFields[Data[f[_]]] = BSONField.Fields[[F[_]] =>> Record.AsRecord[Data, F]]
 }
+
+trait Compat

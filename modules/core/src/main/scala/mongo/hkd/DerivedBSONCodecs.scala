@@ -1,12 +1,12 @@
 package mongo.hkd
 
-import reactivemongo.api.bson._
+import reactivemongo.api.bson.*
 
 import scala.util.Try
 
 private[hkd] class DerivedBSONReader[Data[f[_]], F[_]](
     override val fields: BSONField.Fields[Data],
-    readers: Iterable[BSONReader[_]],
+    readers: Iterable[BSONReader[?]],
     ctor: Seq[Any] => Data[F]
 ) extends BSONDocumentReader[Data[F]] with DerivedBSONInstance[Data, F] {
   override def readDocument(bson: BSONDocument): Try[Data[F]] =
@@ -23,7 +23,7 @@ private[hkd] class DerivedBSONReader[Data[f[_]], F[_]](
 
 private[hkd] class DerivedBSONWriter[Data[f[_]], F[_]](
     override val fields: BSONField.Fields[Data],
-    writers: Iterable[BSONWriter[_]]
+    writers: Iterable[BSONWriter[?]]
 ) extends BSONDocumentWriter[Data[F]] with DerivedBSONInstance[Data, F] {
   override def writeTry(data: Data[F]): Try[BSONDocument] =
     (productIter(data) zip productIter(fields) zip writers)

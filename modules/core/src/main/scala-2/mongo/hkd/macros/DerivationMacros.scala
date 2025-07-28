@@ -113,6 +113,6 @@ class DerivationMacros(val c: blackbox.Context) {
 
 }
 
-final case class NamingResolver[Data[f[_]]] private (naming: String => String) extends (String => String) {
+final case class NamingResolver[Data[f[_]]](naming: String => String) extends (String => String) {
   override def apply(v1: String): String = naming(v1)
 }

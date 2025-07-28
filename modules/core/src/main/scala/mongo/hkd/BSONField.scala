@@ -1,6 +1,6 @@
 package mongo.hkd
 
-import reactivemongo.api.bson._
+import reactivemongo.api.bson.*
 
 import scala.util.Try
 
@@ -38,6 +38,6 @@ final case class PositionalArrayField[A, T](field: BSONField[A])
 
 trait LowPriorityImplicits {
   implicit class PositionalArrayFieldOps[A, T](field: BSONField[A])(implicit f: DerivedFieldType.Array[A, T]) {
-    def $ : PositionalArrayField[A, T] = PositionalArrayField[A, T](BSONField(s"${field.fieldName}.$$"))
+    infix def $ : PositionalArrayField[A, T] = PositionalArrayField[A, T](BSONField(s"${field.fieldName}.$$"))
   }
 }

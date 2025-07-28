@@ -1,11 +1,11 @@
 package mongo.hkd
 
-import mongo.hkd.dsl._
-import mongo.hkd.implicits._
+import mongo.hkd.dsl.*
+import mongo.hkd.implicits.*
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import reactivemongo.api.bson.BSONValue.pretty
-import reactivemongo.api.bson._
+import reactivemongo.api.bson.*
 
 import java.util.UUID
 
@@ -25,7 +25,7 @@ class BSONFieldTest extends AnyFreeSpec with Matchers {
 
     "deriving" - {
       "identity" in withNaming(identity) { fs =>
-        import fs._
+        import fs.*
         fields.id.fieldName should be("id")
         fields.description.fieldName should be("description")
         fields.isActive.fieldName should be("isActive")
@@ -39,7 +39,7 @@ class BSONFieldTest extends AnyFreeSpec with Matchers {
         fields.otherData./.secondField.fieldName should be("otherData.secondField")
       }
       "snakeCase" in withNaming(renaming.snakeCase) { fs =>
-        import fs._
+        import fs.*
         fields.id.fieldName should be("id")
         fields.description.fieldName should be("description")
         fields.isActive.fieldName should be("is_active")
@@ -53,7 +53,7 @@ class BSONFieldTest extends AnyFreeSpec with Matchers {
         fields.otherData./.secondField.fieldName should be("other_data.second_field")
       }
       "kebabCase" in withNaming(renaming.kebabCase) { fs =>
-        import fs._
+        import fs.*
         fields.id.fieldName should be("id")
         fields.description.fieldName should be("description")
         fields.isActive.fieldName should be("is-active")

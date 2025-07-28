@@ -12,7 +12,7 @@ import scala.concurrent.{ExecutionContext, Future}
 sealed trait ScalaTypeMongoIndexTypeMapping[A, T <: IndexType]
 
 @nowarn("msg=is never used")
-object ScalaTypeMongoIndexTypeMapping {
+object ScalaTypeMongoIndexTypeMapping extends Compat {
 
   type Ged2D[A]          = ScalaTypeMongoIndexTypeMapping[A, IndexType.Geo2D.type]
   type Geo2DSpherical[A] = ScalaTypeMongoIndexTypeMapping[A, IndexType.Geo2DSpherical.type]
@@ -21,7 +21,7 @@ object ScalaTypeMongoIndexTypeMapping {
   type Hashed[A]         = ScalaTypeMongoIndexTypeMapping[A, IndexType.Hashed.type]
   type Ascending[A]      = ScalaTypeMongoIndexTypeMapping[A, IndexType.Ascending.type]
   type Descending[A]     = ScalaTypeMongoIndexTypeMapping[A, IndexType.Descending.type]
-  type Ordered[A]        = Ascending[A] with Descending[A]
+  type Ordered[A]        = Ascending[A] & Descending[A]
 
   def geo2D[A]: Ged2D[A]                   = null
   def geo2DSpherical[A]: Geo2DSpherical[A] = null
@@ -107,7 +107,7 @@ object IndexBuilder {
         storageEngine = storageEngine,
         weights = Some(keys.flatMap { key => key.weight.map(w => BSONElement(key.fieldName, w)) })
           .filter(_.nonEmpty)
-          .map(weights => document(weights: _*)),
+          .map(weights => document(weights*)),
         defaultLanguage = defaultLanguage,
         languageOverride = languageOverride,
         textIndexVersion = textIndexVersion,
@@ -127,7 +127,6 @@ object IndexBuilder {
 
 trait IndexDsl extends IndexDslLowPriorityImplicits {
 
-  @nowarn("msg=is never used")
   implicit class BSONFieldIndexOps[A](private val field: BSONField[A]) {
     def ascending(implicit
         mapping: ScalaTypeMongoIndexTypeMapping.Ascending[A]

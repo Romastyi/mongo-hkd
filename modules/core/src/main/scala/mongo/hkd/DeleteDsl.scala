@@ -3,7 +3,7 @@ package mongo.hkd
 import mongo.hkd.Record.RecordFields
 import reactivemongo.api.bson.collection.BSONCollection
 import reactivemongo.api.commands.WriteResult
-import reactivemongo.api.ext._
+import reactivemongo.api.ext.*
 import reactivemongo.api.{Collation, WriteConcern}
 
 import scala.concurrent.{ExecutionContext, Future}

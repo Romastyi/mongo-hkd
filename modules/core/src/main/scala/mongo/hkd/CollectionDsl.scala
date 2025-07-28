@@ -1,6 +1,7 @@
 package mongo.hkd
 
 import reactivemongo.api.bson.BSONObjectID
+import reactivemongo.api.bson.collection.BSONCollectionProducer
 import reactivemongo.api.{DB, FailoverStrategy}
 
 trait CollectionDsl {

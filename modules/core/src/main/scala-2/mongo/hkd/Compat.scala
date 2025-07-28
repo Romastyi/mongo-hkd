@@ -10,6 +10,10 @@ trait BSONFieldCompat[A] { self: BSONField[A] =>
     macro DerivationMacros.nestedImpl[A, Data]
 }
 
-trait RecordCompat {
+trait RecordCompat extends Compat {
   type RecordFields[Data[f[_]]] = BSONField.Fields[Record.AsRecord[Data, *[_]]]
+}
+
+trait Compat {
+  type &[A, B] = A with B
 }
